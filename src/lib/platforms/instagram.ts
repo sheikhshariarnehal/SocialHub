@@ -75,17 +75,36 @@ export class InstagramAdapter implements PlatformAdapter {
   async getProfile(accessToken: string): Promise<PlatformProfile> {
     if (accessToken && !accessToken.startsWith("ig_live_token_")) {
       try {
+        // 1. Check all user Facebook pages for a linked Instagram Professional account
         const res = await fetch(
-          `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,instagram_business_account{id,username,profile_picture_url}&access_token=${accessToken}`
+          `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,instagram_business_account{id,username,name,profile_picture_url}&access_token=${accessToken}`
         );
         const data = await res.json();
-        const igAccount = data.data?.[0]?.instagram_business_account;
-        if (igAccount) {
+        
+        // Find any page with an active linked Instagram account
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pageWithIg = data.data?.find((p: any) => p.instagram_business_account);
+        if (pageWithIg?.instagram_business_account) {
+          const ig = pageWithIg.instagram_business_account;
           return {
-            id: igAccount.id,
-            displayName: igAccount.username || data.data[0].name,
-            handle: `@${igAccount.username}`,
-            avatarUrl: igAccount.profile_picture_url || null,
+            id: ig.id,
+            displayName: ig.name || ig.username || pageWithIg.name,
+            handle: `@${ig.username || ig.name?.toLowerCase().replace(/\s+/g, "_")}`,
+            avatarUrl: ig.profile_picture_url || null,
+          };
+        }
+
+        // 2. If no linked Instagram business account found, fetch the user's real Meta profile
+        const meRes = await fetch(
+          `https://graph.facebook.com/v19.0/me?fields=id,name,picture.type(large)&access_token=${accessToken}`
+        );
+        const meData = await meRes.json();
+        if (meData.id) {
+          return {
+            id: meData.id,
+            displayName: `${meData.name}`,
+            handle: `@${meData.name?.toLowerCase().replace(/\s+/g, "_")}`,
+            avatarUrl: meData.picture?.data?.url || null,
           };
         }
       } catch (err) {
@@ -95,14 +114,14 @@ export class InstagramAdapter implements PlatformAdapter {
 
     return {
       id: "ig_user_10928374",
-      displayName: "My Instagram Account",
-      handle: "@my_instagram",
+      displayName: "Instagram User",
+      handle: "@instagram_account",
       avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
-      followerCount: 24500,
+      followerCount: 0,
     };
   }
 
-  async publishPost(accessToken: string, payload: PostPayload): Promise<PublishResult> {
+  async publishPost(_accessToken: string, _payload: PostPayload): Promise<PublishResult> {
     const externalId = `ig_media_${Date.now()}`;
     return {
       success: true,
