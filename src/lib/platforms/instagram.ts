@@ -15,8 +15,8 @@ export class InstagramAdapter implements PlatformAdapter {
     if (!clientId) {
       return `/api/social/callback/instagram?code=demo_auth_code&state=${encodeURIComponent(state)}`;
     }
-    // Meta permissions required for Instagram Professional accounts
-    const scopes = process.env.INSTAGRAM_SCOPES || "public_profile,pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish";
+    // Valid Meta permissions that grant access to connected Instagram Professional accounts via Facebook Page
+    const scopes = process.env.INSTAGRAM_SCOPES || "public_profile,pages_show_list,pages_read_engagement";
     return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&state=${encodeURIComponent(state)}&scope=${encodeURIComponent(scopes)}&response_type=code&auth_type=rerequest`;
