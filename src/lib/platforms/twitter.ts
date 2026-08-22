@@ -55,6 +55,8 @@ export class TwitterAdapter implements PlatformAdapter {
             expiresInSeconds: expiresIn,
             tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
           };
+        } else {
+          console.error("Twitter token response error:", data);
         }
       } catch (err) {
         console.error("Failed live Twitter OAuth exchange:", err);
@@ -70,6 +72,42 @@ export class TwitterAdapter implements PlatformAdapter {
   }
 
   async refreshTokens(refreshToken: string): Promise<TokenPair> {
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+
+    if (clientId && clientSecret && !refreshToken.startsWith("tw_refresh_")) {
+      try {
+        const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+        const body = new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+          client_id: clientId,
+        });
+
+        const res = await fetch("https://api.twitter.com/2/oauth2/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Authorization: `Basic ${authHeader}`,
+          },
+          body: body.toString(),
+        });
+
+        const data = await res.json();
+        if (data.access_token) {
+          const expiresIn = data.expires_in || 7200;
+          return {
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token || refreshToken,
+            expiresInSeconds: expiresIn,
+            tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
+          };
+        }
+      } catch (err) {
+        console.error("Failed refreshing Twitter tokens:", err);
+      }
+    }
+
     return {
       accessToken: `tw_refreshed_token_${Date.now()}`,
       refreshToken: refreshToken,
@@ -111,7 +149,43 @@ export class TwitterAdapter implements PlatformAdapter {
     };
   }
 
-  async publishPost(_accessToken: string, _payload: PostPayload): Promise<PublishResult> {
+  async publishPost(accessToken: string, payload: PostPayload): Promise<PublishResult> {
+    if (accessToken && !accessToken.startsWith("tw_live_token_") && !accessToken.startsWith("token_")) {
+      try {
+        const tweetRes = await fetch("https://api.twitter.com/2/tweets", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text: payload.content,
+          }),
+        });
+
+        const tweetData = await tweetRes.json();
+        if (tweetData.data?.id) {
+          return {
+            success: true,
+            externalPostId: tweetData.data.id,
+            externalPostUrl: `https://x.com/user/status/${tweetData.data.id}`,
+          };
+        } else {
+          return {
+            success: false,
+            errorMessage: tweetData.detail || tweetData.title || "X API rejected tweet publication.",
+          };
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to publish Tweet.";
+        console.error("Twitter live publish error:", err);
+        return {
+          success: false,
+          errorMessage: message,
+        };
+      }
+    }
+
     const externalId = `tw_status_${Date.now()}`;
     return {
       success: true,
