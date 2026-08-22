@@ -21,6 +21,7 @@ import {
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { logout } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
+import { PlugConnectedIcon, SparklesIcon } from "@/components/icons";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -31,8 +32,8 @@ const NAV_ITEMS = [
 ];
 
 const SETTINGS_ITEMS = [
-  { label: "AI Hub", href: "/settings/ai-providers", icon: Sparkles },
-  { label: "Accounts", href: "/settings/accounts", icon: Share2 },
+  { label: "AI Hub", href: "/settings/ai-providers", icon: SparklesIcon },
+  { label: "Accounts", href: "/settings/accounts", icon: PlugConnectedIcon },
   { label: "Settings", href: "/settings/workspace", icon: Settings },
 ];
 

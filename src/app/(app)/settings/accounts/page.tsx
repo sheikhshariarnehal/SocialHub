@@ -38,6 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PlugConnectedIcon } from "@/components/icons";
 import { useWorkspaceStore } from "@/hooks/use-workspace";
 import {
   getWorkspaceAccounts,
@@ -437,7 +438,7 @@ export default function AccountsSettingsPage() {
                       className="w-full text-xs h-8 gap-1.5"
                       onClick={() => handleConnect(p.platform)}
                     >
-                      <Plus className="h-3.5 w-3.5" />
+                      <PlugConnectedIcon size={14} />
                       Connect {p.platform}
                     </Button>
                   )}

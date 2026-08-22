@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { useUser } from "@/hooks/use-user";
+import { BellIcon } from "@/components/icons";
 
 const MOCK_NOTIFICATIONS = [
   {
@@ -84,7 +85,7 @@ export function TopBar() {
             className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card/50 text-muted-foreground hover:text-foreground hover:bg-card transition-all"
             title="Notifications"
           >
-            <Bell className="h-4 w-4" />
+            <BellIcon size={16} />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground animate-pulse">
                 {unreadCount}
