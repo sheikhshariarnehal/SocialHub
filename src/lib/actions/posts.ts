@@ -84,6 +84,7 @@ export async function createPost(input: CreatePostInput) {
 
       let externalPostId: string | null = null;
       let targetStatus: "published" | "pending" | "failed" = input.publishImmediately ? "published" : "pending";
+      let errorMessage: string | null = null;
 
       if (input.publishImmediately) {
         const platformKey = (matchedAccount?.platform || targetIdOrPlatform) as PlatformType;
@@ -100,11 +101,14 @@ export async function createPost(input: CreatePostInput) {
             targetStatus = "published";
           } else {
             targetStatus = "failed";
+            errorMessage = publishRes.errorMessage || "Publishing was not completed.";
           }
           targetResults.push({ platform: platformKey, ...publishRes });
-        } catch (pubErr) {
+        } catch (pubErr: unknown) {
+          const message = pubErr instanceof Error ? pubErr.message : "Publishing error";
           console.error(`Publishing failed on platform ${platformKey}:`, pubErr);
           targetStatus = "failed";
+          errorMessage = message;
         }
       }
 
@@ -114,6 +118,7 @@ export async function createPost(input: CreatePostInput) {
           social_account_id: matchedAccount.id,
           status: targetStatus,
           external_post_id: externalPostId,
+          error_message: errorMessage,
           published_at: input.publishImmediately ? new Date().toISOString() : null,
         });
       }
@@ -174,11 +179,11 @@ export async function getWorkspacePosts(workspaceId: string): Promise<Post[]> {
         id,
         status,
         external_post_id,
+        error_message,
         social_accounts (
           id,
           platform,
           display_name,
-          handle,
           avatar_url
         )
       )

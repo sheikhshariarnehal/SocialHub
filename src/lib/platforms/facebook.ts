@@ -75,6 +75,23 @@ export class FacebookAdapter implements PlatformAdapter {
   async getProfile(accessToken: string): Promise<PlatformProfile> {
     if (accessToken && !accessToken.startsWith("fb_live_token_")) {
       try {
+        // 1. Fetch user's pages to find primary page if any
+        const pagesRes = await fetch(
+          `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,picture.type(large)&access_token=${accessToken}`
+        );
+        const pagesData = await pagesRes.json();
+        const firstPage = pagesData.data?.[0];
+
+        if (firstPage?.id) {
+          return {
+            id: firstPage.id,
+            displayName: firstPage.name,
+            handle: `@${firstPage.name?.toLowerCase().replace(/\s+/g, "_")}`,
+            avatarUrl: firstPage.picture?.data?.url || null,
+          };
+        }
+
+        // 2. Fallback to personal profile
         const res = await fetch(
           `https://graph.facebook.com/v19.0/me?fields=id,name,picture.type(large)&access_token=${accessToken}`
         );
@@ -109,8 +126,16 @@ export class FacebookAdapter implements PlatformAdapter {
         );
         const pagesData = await pagesRes.json();
         const page = pagesData.data?.[0];
-        const targetId = page?.id || "me";
-        const pageToken = page?.access_token || accessToken;
+
+        if (!page) {
+          return {
+            success: false,
+            errorMessage: "No Facebook Page found. Meta Graph API only permits posting to Facebook Pages, not personal profile timelines.",
+          };
+        }
+
+        const targetId = page.id;
+        const pageToken = page.access_token || accessToken;
 
         const postRes = await fetch(`https://graph.facebook.com/v19.0/${targetId}/feed`, {
           method: "POST",
@@ -127,9 +152,19 @@ export class FacebookAdapter implements PlatformAdapter {
             externalPostId: postData.id,
             externalPostUrl: `https://facebook.com/${postData.id}`,
           };
+        } else {
+          return {
+            success: false,
+            errorMessage: postData.error?.message || "Facebook Graph API rejected the post.",
+          };
         }
-      } catch (err) {
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to contact Facebook Graph API.";
         console.error("Facebook live publish error:", err);
+        return {
+          success: false,
+          errorMessage: message,
+        };
       }
     }
 

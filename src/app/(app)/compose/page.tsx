@@ -100,7 +100,17 @@ export default function ComposePage() {
       if (isDraft) {
         toast.success("Draft saved successfully!");
       } else if (publishImmediately) {
-        toast.success("Post published across all selected channels!");
+        const failed = res.targetResults?.filter((r) => !r.success) || [];
+        const succeeded = res.targetResults?.filter((r) => r.success) || [];
+
+        if (succeeded.length > 0) {
+          toast.success(`Published successfully to ${succeeded.map((s) => s.platform).join(", ")}!`);
+        }
+        if (failed.length > 0) {
+          failed.forEach((f) => {
+            toast.error(`${f.platform.toUpperCase()}: ${f.errorMessage || "Publishing not completed"}`);
+          });
+        }
       } else {
         toast.success(`Post scheduled for ${scheduledDate} at ${scheduledTime}!`);
       }
