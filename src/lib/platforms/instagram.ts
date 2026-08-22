@@ -15,8 +15,8 @@ export class InstagramAdapter implements PlatformAdapter {
     if (!clientId) {
       return `/api/social/callback/instagram?code=demo_auth_code&state=${encodeURIComponent(state)}`;
     }
-    // Standard Facebook Login permissions that grant access to connected Instagram Business Accounts
-    const scopes = process.env.INSTAGRAM_SCOPES || "public_profile,pages_show_list,pages_read_engagement";
+    // Meta permissions required for Instagram Professional accounts
+    const scopes = process.env.INSTAGRAM_SCOPES || "public_profile,pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish";
     return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&state=${encodeURIComponent(state)}&scope=${encodeURIComponent(scopes)}&response_type=code&auth_type=rerequest`;
@@ -72,29 +72,82 @@ export class InstagramAdapter implements PlatformAdapter {
     };
   }
 
+  private async resolveInstagramBusinessId(accessToken: string): Promise<{ id: string; username?: string; name?: string; picture?: string; pageToken?: string } | null> {
+    try {
+      // 1. Try standard /me/accounts
+      const res = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}&access_token=${accessToken}`
+      );
+      const data = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pageWithIg = data.data?.find((p: any) => p.instagram_business_account);
+      if (pageWithIg?.instagram_business_account) {
+        const ig = pageWithIg.instagram_business_account;
+        return {
+          id: ig.id,
+          username: ig.username,
+          name: ig.name || pageWithIg.name,
+          picture: ig.profile_picture_url,
+          pageToken: pageWithIg.access_token || accessToken,
+        };
+      }
+
+      // 2. If /me/accounts is empty (Business portfolio pages), inspect debug_token target_ids
+      const clientId = process.env.FACEBOOK_CLIENT_ID || process.env.INSTAGRAM_CLIENT_ID;
+      const clientSecret = process.env.FACEBOOK_CLIENT_SECRET || process.env.INSTAGRAM_CLIENT_SECRET;
+
+      if (clientId && clientSecret) {
+        const debugRes = await fetch(
+          `https://graph.facebook.com/debug_token?input_token=${accessToken}&access_token=${clientId}|${clientSecret}`
+        );
+        const debugData = await debugRes.json();
+        const granular = debugData.data?.granular_scopes || [];
+        const targetIds = new Set<string>();
+
+        for (const g of granular) {
+          if (Array.isArray(g.target_ids)) {
+            g.target_ids.forEach((id: string) => targetIds.add(id));
+          }
+        }
+
+        for (const pageId of targetIds) {
+          const pageRes = await fetch(
+            `https://graph.facebook.com/v19.0/${pageId}?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}&access_token=${accessToken}`
+          );
+          const pageData = await pageRes.json();
+          if (pageData.instagram_business_account) {
+            const ig = pageData.instagram_business_account;
+            return {
+              id: ig.id,
+              username: ig.username,
+              name: ig.name || pageData.name,
+              picture: ig.profile_picture_url,
+              pageToken: pageData.access_token || accessToken,
+            };
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error resolving Instagram Business ID:", err);
+    }
+
+    return null;
+  }
+
   async getProfile(accessToken: string): Promise<PlatformProfile> {
     if (accessToken && !accessToken.startsWith("ig_live_token_")) {
       try {
-        // 1. Check all user Facebook pages for a linked Instagram Professional account
-        const res = await fetch(
-          `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,instagram_business_account{id,username,name,profile_picture_url}&access_token=${accessToken}`
-        );
-        const data = await res.json();
-        
-        // Find any page with an active linked Instagram account
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pageWithIg = data.data?.find((p: any) => p.instagram_business_account);
-        if (pageWithIg?.instagram_business_account) {
-          const ig = pageWithIg.instagram_business_account;
+        const igInfo = await this.resolveInstagramBusinessId(accessToken);
+        if (igInfo) {
           return {
-            id: ig.id,
-            displayName: ig.name || ig.username || pageWithIg.name,
-            handle: `@${ig.username || ig.name?.toLowerCase().replace(/\s+/g, "_")}`,
-            avatarUrl: ig.profile_picture_url || null,
+            id: igInfo.id,
+            displayName: igInfo.name || igInfo.username || "Instagram Account",
+            handle: `@${igInfo.username || igInfo.name?.toLowerCase().replace(/\s+/g, "_")}`,
+            avatarUrl: igInfo.picture || null,
           };
         }
 
-        // 2. If no linked Instagram business account found, fetch the user's real Meta profile
+        // Fallback to Meta user profile
         const meRes = await fetch(
           `https://graph.facebook.com/v19.0/me?fields=id,name,picture.type(large)&access_token=${accessToken}`
         );
@@ -114,7 +167,7 @@ export class InstagramAdapter implements PlatformAdapter {
 
     return {
       id: "ig_user_10928374",
-      displayName: "Instagram User",
+      displayName: "Instagram Professional",
       handle: "@instagram_account",
       avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
       followerCount: 0,
@@ -124,53 +177,61 @@ export class InstagramAdapter implements PlatformAdapter {
   async publishPost(accessToken: string, payload: PostPayload): Promise<PublishResult> {
     if (accessToken && !accessToken.startsWith("ig_live_token_") && !accessToken.startsWith("token_")) {
       try {
-        const res = await fetch(
-          `https://graph.facebook.com/v19.0/me/accounts?fields=id,instagram_business_account{id}&access_token=${accessToken}`
-        );
-        const data = await res.json();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pageWithIg = data.data?.find((p: any) => p.instagram_business_account);
-        const igId = pageWithIg?.instagram_business_account?.id;
+        const igInfo = await this.resolveInstagramBusinessId(accessToken);
+        if (!igInfo) {
+          return {
+            success: false,
+            errorMessage: "No Instagram Business account linked to your Facebook Page. Please link your Instagram account to your Facebook Page in Meta Business Suite.",
+          };
+        }
 
-        if (igId && payload.mediaUrls && payload.mediaUrls.length > 0) {
-          const firstMedia = payload.mediaUrls[0];
-          const isVideo = /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(firstMedia);
+        const igId = igInfo.id;
+        const publishToken = igInfo.pageToken || accessToken;
 
-          const mediaEndpoint = isVideo
-            ? `https://graph.facebook.com/v19.0/${igId}/media?media_type=REELS&video_url=${encodeURIComponent(
-                firstMedia
-              )}&caption=${encodeURIComponent(payload.content)}&access_token=${accessToken}`
-            : `https://graph.facebook.com/v19.0/${igId}/media?image_url=${encodeURIComponent(
-                firstMedia
-              )}&caption=${encodeURIComponent(payload.content)}&access_token=${accessToken}`;
+        if (!payload.mediaUrls || payload.mediaUrls.length === 0) {
+          return {
+            success: false,
+            errorMessage: "Instagram requires at least one image or video attachment to publish a post.",
+          };
+        }
 
-          const mediaRes = await fetch(mediaEndpoint, { method: "POST" });
-          const mediaData = await mediaRes.json();
+        const firstMedia = payload.mediaUrls[0];
+        const isVideo = /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(firstMedia);
 
-          if (mediaData.id) {
-            const pubRes = await fetch(
-              `https://graph.facebook.com/v19.0/${igId}/media_publish?creation_id=${mediaData.id}&access_token=${accessToken}`,
-              { method: "POST" }
-            );
-            const pubData = await pubRes.json();
-            if (pubData.id) {
-              return {
-                success: true,
-                externalPostId: pubData.id,
-                externalPostUrl: `https://instagram.com/p/${pubData.id}`,
-              };
-            } else {
-              return {
-                success: false,
-                errorMessage: pubData.error?.message || "Instagram media publish failed.",
-              };
-            }
+        const mediaEndpoint = isVideo
+          ? `https://graph.facebook.com/v19.0/${igId}/media?media_type=REELS&video_url=${encodeURIComponent(
+              firstMedia
+            )}&caption=${encodeURIComponent(payload.content)}&access_token=${publishToken}`
+          : `https://graph.facebook.com/v19.0/${igId}/media?image_url=${encodeURIComponent(
+              firstMedia
+            )}&caption=${encodeURIComponent(payload.content)}&access_token=${publishToken}`;
+
+        const mediaRes = await fetch(mediaEndpoint, { method: "POST" });
+        const mediaData = await mediaRes.json();
+
+        if (mediaData.id) {
+          const pubRes = await fetch(
+            `https://graph.facebook.com/v19.0/${igId}/media_publish?creation_id=${mediaData.id}&access_token=${publishToken}`,
+            { method: "POST" }
+          );
+          const pubData = await pubRes.json();
+          if (pubData.id) {
+            return {
+              success: true,
+              externalPostId: pubData.id,
+              externalPostUrl: `https://instagram.com/p/${pubData.id}`,
+            };
           } else {
             return {
               success: false,
-              errorMessage: mediaData.error?.message || "Instagram container creation failed.",
+              errorMessage: pubData.error?.message || "Instagram media publish failed.",
             };
           }
+        } else {
+          return {
+            success: false,
+            errorMessage: mediaData.error?.message || "Instagram media container creation failed.",
+          };
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Instagram publish error";
