@@ -1,14 +1,13 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Send,
   Calendar,
-  MessageSquare,
   Sparkles,
   ArrowUpRight,
   TrendingUp,
-  AlertCircle,
   CheckCircle2,
   Clock,
   Plus,
@@ -24,98 +23,10 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
-
-const STATS = [
-  {
-    title: "Published This Month",
-    value: "42",
-    change: "+18%",
-    isPositive: true,
-    icon: Send,
-    color: "text-primary",
-  },
-  {
-    title: "Scheduled Upcoming",
-    value: "14",
-    change: "Next in 2h",
-    isPositive: true,
-    icon: Calendar,
-    color: "text-info",
-  },
-  {
-    title: "Total Engagement",
-    value: "8.4K",
-    change: "+24.5%",
-    isPositive: true,
-    icon: TrendingUp,
-    color: "text-success",
-  },
-  {
-    title: "AI Generations Quota",
-    value: "12 / 20",
-    change: "60% used",
-    isPositive: false,
-    icon: Sparkles,
-    color: "text-warning",
-  },
-];
-
-const CONNECTED_ACCOUNTS = [
-  {
-    platform: "Instagram",
-    handle: "@acmedesign",
-    status: "connected",
-    expiry: "58 days left",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&auto=format&fit=crop&q=60",
-    badgeVariant: "instagram" as const,
-  },
-  {
-    platform: "LinkedIn",
-    handle: "Acme Agency Inc.",
-    status: "connected",
-    expiry: "24 days left",
-    avatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=80&auto=format&fit=crop&q=60",
-    badgeVariant: "linkedin" as const,
-  },
-  {
-    platform: "X (Twitter)",
-    handle: "@acme_hq",
-    status: "connected",
-    expiry: "Permanent token",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&auto=format&fit=crop&q=60",
-    badgeVariant: "twitter" as const,
-  },
-];
-
-const UPCOMING_POSTS = [
-  {
-    id: "post-1",
-    content:
-      "🚀 Announcing our Q3 product roadmap: AI-driven scheduling, unified analytics, and auto-reply agents. Read the breakdown...",
-    platforms: ["linkedin", "twitter"],
-    scheduledFor: "Today at 2:00 PM",
-    timeAgo: "in 2 hours",
-    mediaUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=60",
-  },
-  {
-    id: "post-2",
-    content:
-      "Design systems are more than just component libraries — they are the connective tissue of modern software engineering. 🎨 #DesignSystems #UIUX",
-    platforms: ["instagram", "linkedin"],
-    scheduledFor: "Tomorrow at 9:30 AM",
-    timeAgo: "in 21 hours",
-    mediaUrl: null,
-  },
-  {
-    id: "post-3",
-    content:
-      "Behind the scenes at our new remote HQ. The team is shipping faster than ever! ⚡️",
-    platforms: ["instagram", "twitter"],
-    scheduledFor: "Aug 24, 4:00 PM",
-    timeAgo: "in 2 days",
-    mediaUrl: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=150&auto=format&fit=crop&q=60",
-  },
-];
+import { useWorkspaceStore } from "@/hooks/use-workspace";
+import { getWorkspacePosts } from "@/lib/actions/posts";
+import { getWorkspaceAccounts } from "@/lib/actions/social-accounts";
+import type { Post, SocialAccount } from "@/lib/database.types";
 
 const RECENT_MESSAGES = [
   {
@@ -145,6 +56,65 @@ const RECENT_MESSAGES = [
 ];
 
 export default function DashboardOverviewPage() {
+  const { currentWorkspace } = useWorkspaceStore();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      if (currentWorkspace?.id) {
+        setIsLoading(true);
+        const [postsData, accountsData] = await Promise.all([
+          getWorkspacePosts(currentWorkspace.id),
+          getWorkspaceAccounts(currentWorkspace.id),
+        ]);
+        setPosts(postsData);
+        setAccounts(accountsData);
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, [currentWorkspace?.id]);
+
+  const publishedCount = posts.filter((p) => p.status === "published").length;
+  const scheduledCount = posts.filter((p) => p.status === "scheduled").length;
+
+  const STATS = [
+    {
+      title: "Published Posts",
+      value: publishedCount.toString(),
+      change: publishedCount > 0 ? "+100%" : "0",
+      isPositive: true,
+      icon: Send,
+      color: "text-primary",
+    },
+    {
+      title: "Scheduled Upcoming",
+      value: scheduledCount.toString(),
+      change: scheduledCount > 0 ? "Queued" : "None",
+      isPositive: true,
+      icon: Calendar,
+      color: "text-info",
+    },
+    {
+      title: "Connected Channels",
+      value: accounts.length.toString(),
+      change: `${accounts.length} active`,
+      isPositive: true,
+      icon: TrendingUp,
+      color: "text-success",
+    },
+    {
+      title: "AI Generation Quota",
+      value: "20 / 20",
+      change: "Free tier",
+      isPositive: false,
+      icon: Sparkles,
+      color: "text-warning",
+    },
+  ];
+
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-300">
       {/* Header Banner */}
@@ -213,76 +183,72 @@ export default function DashboardOverviewPage() {
             <CardHeader className="flex flex-row items-center justify-between pb-4">
               <div>
                 <CardTitle className="text-base font-semibold">
-                  Publishing Pipeline
+                  Publishing Pipeline & History
                 </CardTitle>
                 <CardDescription>
-                  Upcoming posts queued across connected channels
+                  Posts created, published, or scheduled across your connected channels
                 </CardDescription>
               </div>
               <Link
                 href="/calendar"
                 className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
               >
-                View all ({UPCOMING_POSTS.length})
+                View calendar ({posts.length})
                 <ArrowUpRight className="h-3 w-3" />
               </Link>
             </CardHeader>
             <CardContent className="space-y-3">
-              {UPCOMING_POSTS.map((post) => (
-                <div
-                  key={post.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border/60 bg-card/40 hover:bg-card/80 transition-all"
-                >
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    {post.mediaUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={post.mediaUrl}
-                        alt="Post media"
-                        className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border/40"
-                      />
-                    ) : (
-                      <div className="h-12 w-12 rounded-lg bg-accent/60 flex items-center justify-center shrink-0 text-muted-foreground border border-border/40">
-                        <Send className="h-5 w-5" />
+              {isLoading ? (
+                <div className="p-6 text-center text-xs text-muted-foreground">Loading posts...</div>
+              ) : posts.length === 0 ? (
+                <div className="p-6 text-center text-xs text-muted-foreground">
+                  No posts yet. Click &quot;New Post&quot; to publish across your channels!
+                </div>
+              ) : (
+                posts.slice(0, 5).map((post) => (
+                  <div
+                    key={post.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border/60 bg-card/40 hover:bg-card/80 transition-all"
+                  >
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="h-10 w-10 rounded-lg bg-accent/60 flex items-center justify-center shrink-0 text-muted-foreground border border-border/40">
+                        <Send className="h-4 w-4" />
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground line-clamp-2 leading-relaxed">
-                        {post.content}
-                      </p>
-                      <div className="flex items-center gap-2 mt-2">
-                        {post.platforms.map((p) => (
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground line-clamp-2 leading-relaxed">
+                          {post.content || "Media post"}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
                           <Badge
-                            key={p}
                             variant={
-                              p === "instagram"
-                                ? "instagram"
-                                : p === "linkedin"
-                                ? "linkedin"
-                                : "twitter"
+                              post.status === "published"
+                                ? "success"
+                                : post.status === "scheduled"
+                                ? "info"
+                                : "secondary"
                             }
-                            className="text-[10px] px-2 py-0"
+                            className="text-[10px] px-2 py-0 capitalize"
                           >
-                            {p.charAt(0).toUpperCase() + p.slice(1)}
+                            {post.status}
                           </Badge>
-                        ))}
-                        <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {post.scheduledFor} ({post.timeAgo})
-                        </span>
+                          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(post.published_at || post.scheduled_at || post.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                    <Link href={`/compose?edit=${post.id}`}>
-                      <Button variant="outline" size="sm" className="h-8 text-xs">
-                        Edit
-                      </Button>
-                    </Link>
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      <Link href="/calendar">
+                        <Button variant="outline" size="sm" className="h-8 text-xs">
+                          View
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -361,28 +327,36 @@ export default function DashboardOverviewPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {CONNECTED_ACCOUNTS.map((acc) => (
-                <div
-                  key={acc.platform}
-                  className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-card/40"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Avatar src={acc.avatar} name={acc.platform} size="sm" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-foreground truncate">
-                        {acc.handle}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {acc.platform} • {acc.expiry}
-                      </p>
+              {isLoading ? (
+                <div className="p-4 text-center text-xs text-muted-foreground">Loading accounts...</div>
+              ) : accounts.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground">
+                  No accounts connected yet.
+                </div>
+              ) : (
+                accounts.map((acc) => (
+                  <div
+                    key={acc.id}
+                    className="flex items-center justify-between p-3 rounded-xl border border-border/60 bg-card/40"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar src={acc.avatar_url || undefined} name={acc.display_name || acc.platform} size="sm" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-foreground truncate">
+                          {acc.display_name || `@${acc.platform}_user`}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground capitalize">
+                          {acc.platform} • Active
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-success text-xs shrink-0 font-medium">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span className="text-[11px]">Active</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 text-success text-xs shrink-0 font-medium">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    <span className="text-[11px]">Active</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
 
               <Link href="/settings/accounts" className="block pt-1">
                 <Button variant="outline" className="w-full text-xs h-9 gap-2 border-dashed">
@@ -432,7 +406,7 @@ export default function DashboardOverviewPage() {
               </div>
 
               <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-                <span>Free Quota: 8 remaining</span>
+                <span>Free Quota: 20 remaining</span>
                 <Link href="/settings/ai-providers" className="text-primary hover:underline">
                   Configure BYO Key →
                 </Link>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -8,75 +8,48 @@ import {
   Plus,
   Clock,
   Send,
-  MoreVertical,
-  CheckCircle2,
   Calendar as CalendarIcon,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-interface ScheduledItem {
-  id: string;
-  day: number; // Day of current month
-  time: string;
-  content: string;
-  platforms: ("instagram" | "twitter" | "linkedin")[];
-  status: "scheduled" | "published" | "draft";
-  mediaUrl?: string;
-}
-
-const SCHEDULED_POSTS: ScheduledItem[] = [
-  {
-    id: "cal-1",
-    day: 22,
-    time: "2:00 PM",
-    content: "🚀 Announcing our Q3 roadmap: AI-driven scheduling & unified inbox.",
-    platforms: ["linkedin", "twitter"],
-    status: "scheduled",
-    mediaUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100",
-  },
-  {
-    id: "cal-2",
-    day: 23,
-    time: "9:30 AM",
-    content: "Design systems are the connective tissue of modern software engineering. 🎨",
-    platforms: ["instagram", "linkedin"],
-    status: "scheduled",
-  },
-  {
-    id: "cal-3",
-    day: 24,
-    time: "4:00 PM",
-    content: "Behind the scenes at our new remote HQ. The team is shipping faster than ever!",
-    platforms: ["instagram", "twitter"],
-    status: "scheduled",
-    mediaUrl: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=100",
-  },
-  {
-    id: "cal-4",
-    day: 19,
-    time: "11:00 AM",
-    content: "Weekly product update: 5 improvements to our customer dashboard.",
-    platforms: ["linkedin"],
-    status: "published",
-  },
-  {
-    id: "cal-5",
-    day: 27,
-    time: "1:00 PM",
-    content: "Why asynchronous communication wins in 2026. A thread 🧵👇",
-    platforms: ["twitter"],
-    status: "scheduled",
-  },
-];
+import { Card } from "@/components/ui/card";
+import { useWorkspaceStore } from "@/hooks/use-workspace";
+import { getWorkspacePosts, deletePost } from "@/lib/actions/posts";
+import type { Post } from "@/lib/database.types";
+import { toast } from "sonner";
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function CalendarPage() {
-  const [currentMonth, setCurrentMonth] = useState("August 2026");
+  const { currentWorkspace } = useWorkspaceStore();
+  const [currentMonth] = useState("August 2026");
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Generate 31 days for the calendar grid
+  const fetchPosts = async () => {
+    if (currentWorkspace?.id) {
+      setIsLoading(true);
+      const data = await getWorkspacePosts(currentWorkspace.id);
+      setPosts(data);
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPosts();
+  }, [currentWorkspace?.id]);
+
+  const handleDelete = async (postId: string) => {
+    const res = await deletePost(postId);
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success("Post removed.");
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+    }
+  };
+
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
   return (
@@ -112,7 +85,7 @@ export default function CalendarPage() {
           <Link href="/compose">
             <Button variant="brand" size="sm" className="gap-1.5">
               <Plus className="h-4 w-4" />
-              Schedule Post
+              Create Post
             </Button>
           </Link>
         </div>
@@ -140,72 +113,146 @@ export default function CalendarPage() {
           ))}
 
           {days.map((day) => {
-            const postsForDay = SCHEDULED_POSTS.filter((p) => p.day === day);
-            const isToday = day === 22;
+            const dayPosts = posts.filter((p) => {
+              const dateStr = p.scheduled_at || p.published_at || p.created_at;
+              if (!dateStr) return false;
+              const date = new Date(dateStr);
+              return date.getDate() === day;
+            });
 
             return (
               <div
                 key={day}
-                className={`group min-h-[130px] p-2 transition-colors relative ${
-                  isToday ? "bg-primary/5" : "bg-card/40 hover:bg-card/70"
-                }`}
+                className="min-h-[130px] p-2 hover:bg-card/40 transition-colors flex flex-col justify-between group relative"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-1.5">
                   <span
-                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                      isToday
-                        ? "bg-primary text-primary-foreground font-bold shadow-xs"
-                        : "text-foreground"
+                    className={`text-xs font-bold ${
+                      day === 22
+                        ? "h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center -ml-1"
+                        : "text-muted-foreground"
                     }`}
                   >
                     {day}
                   </span>
-                  <Link
-                    href={`/compose?date=2026-08-${day.toString().padStart(2, "0")}`}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-primary"
-                    title="Add post for this date"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </Link>
+                  {dayPosts.length > 0 && (
+                    <span className="text-[10px] font-medium text-muted-foreground/80">
+                      {dayPosts.length} post{dayPosts.length > 1 ? "s" : ""}
+                    </span>
+                  )}
                 </div>
 
-                {/* Posts for this day */}
-                <div className="mt-2 space-y-1.5">
-                  {postsForDay.map((post) => (
-                    <Link
+                <div className="space-y-1.5 flex-1">
+                  {dayPosts.map((post) => (
+                    <div
                       key={post.id}
-                      href={`/compose?edit=${post.id}`}
-                      className={`block rounded-lg border p-2 text-left transition-all hover:scale-[1.02] shadow-xs ${
-                        post.status === "published"
-                          ? "border-success/30 bg-success/10"
-                          : "border-primary/30 bg-primary/10"
-                      }`}
+                      className="group/item relative rounded-lg border border-border/70 bg-card p-2 text-xs shadow-xs hover:border-primary/40 hover:shadow-sm transition-all"
                     >
-                      <div className="flex items-center justify-between gap-1 text-[10px] text-muted-foreground mb-1">
-                        <span className="flex items-center gap-1 font-semibold text-foreground">
-                          <Clock className="h-3 w-3" />
-                          {post.time}
-                        </span>
-                        <div className="flex gap-0.5">
-                          {post.platforms.map((p) => (
-                            <span
-                              key={p}
-                              className="h-1.5 w-1.5 rounded-full bg-primary"
-                            />
-                          ))}
-                        </div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <Badge
+                          variant={
+                            post.status === "published"
+                              ? "success"
+                              : post.status === "scheduled"
+                              ? "info"
+                              : "secondary"
+                          }
+                          className="text-[9px] px-1.5 py-0 capitalize"
+                        >
+                          {post.status}
+                        </Badge>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(post.id)}
+                          className="opacity-0 group-hover/item:opacity-100 text-muted-foreground hover:text-destructive transition-opacity p-0.5"
+                          title="Delete post"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
                       </div>
-                      <p className="line-clamp-2 text-[11px] font-medium text-foreground leading-tight">
-                        {post.content}
+
+                      <p className="line-clamp-2 text-[11px] leading-tight text-foreground font-medium">
+                        {post.content || "Media post"}
                       </p>
-                    </Link>
+                    </div>
                   ))}
                 </div>
+
+                <Link
+                  href={`/compose`}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-primary flex items-center gap-0.5 mt-1 font-semibold"
+                >
+                  <Plus className="h-2.5 w-2.5" /> Add
+                </Link>
               </div>
             );
           })}
         </div>
       </Card>
+
+      {/* Recent Activity Stream */}
+      <div className="space-y-3">
+        <h2 className="text-base font-bold tracking-tight">Recent Posts & Publications</h2>
+        {isLoading ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">Loading posts...</div>
+        ) : posts.length === 0 ? (
+          <Card glass className="p-8 text-center">
+            <p className="text-sm text-muted-foreground">No posts created yet.</p>
+            <Link href="/compose" className="mt-3 inline-block">
+              <Button variant="brand" size="sm">
+                <Plus className="h-4 w-4 mr-1.5" />
+                Create your first post
+              </Button>
+            </Link>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {posts.map((post) => (
+              <Card key={post.id} glass className="p-4 space-y-3 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Badge
+                      variant={
+                        post.status === "published"
+                          ? "success"
+                          : post.status === "scheduled"
+                          ? "info"
+                          : "secondary"
+                      }
+                      className="capitalize text-[10px]"
+                    >
+                      {post.status}
+                    </Badge>
+                    <span className="text-[11px] text-muted-foreground">
+                      {new Date(post.published_at || post.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-foreground line-clamp-3 leading-relaxed whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border/40 pt-2.5 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {new Date(post.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(post.id)}
+                    className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

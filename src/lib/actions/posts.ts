@@ -83,7 +83,6 @@ export async function createPost(input: CreatePostInput) {
       );
 
       let externalPostId: string | null = null;
-      let externalPostUrl: string | null = null;
       let targetStatus: "published" | "pending" | "failed" = input.publishImmediately ? "published" : "pending";
 
       if (input.publishImmediately) {
@@ -98,7 +97,6 @@ export async function createPost(input: CreatePostInput) {
 
           if (publishRes.success) {
             externalPostId = publishRes.externalPostId || null;
-            externalPostUrl = publishRes.externalPostUrl || null;
             targetStatus = "published";
           } else {
             targetStatus = "failed";
@@ -116,7 +114,6 @@ export async function createPost(input: CreatePostInput) {
           social_account_id: matchedAccount.id,
           status: targetStatus,
           external_post_id: externalPostId,
-          external_post_url: externalPostUrl,
           published_at: input.publishImmediately ? new Date().toISOString() : null,
         });
       }
@@ -177,7 +174,6 @@ export async function getWorkspacePosts(workspaceId: string): Promise<Post[]> {
         id,
         status,
         external_post_id,
-        external_post_url,
         social_accounts (
           id,
           platform,
