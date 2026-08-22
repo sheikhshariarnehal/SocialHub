@@ -23,7 +23,12 @@ export async function GET(
     const adapter = getPlatformAdapter(platform.toLowerCase() as PlatformType);
     const authUrl = adapter.getAuthorizationUrl(state, redirectUri);
 
-    return NextResponse.redirect(authUrl);
+    // Ensure redirect target is always an absolute URL to comply with Next.js router rules
+    const absoluteTarget = authUrl.startsWith("http://") || authUrl.startsWith("https://")
+      ? authUrl
+      : new URL(authUrl, request.url).toString();
+
+    return NextResponse.redirect(absoluteTarget);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to generate authorization URL";
     console.error("Connect route error:", err);
