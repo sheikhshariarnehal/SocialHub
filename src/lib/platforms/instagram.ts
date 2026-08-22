@@ -15,8 +15,8 @@ export class InstagramAdapter implements PlatformAdapter {
     if (!clientId) {
       return `/api/social/callback/instagram?code=demo_auth_code&state=${encodeURIComponent(state)}`;
     }
-    // Standard developer mode permissions
-    const scopes = process.env.INSTAGRAM_SCOPES || "public_profile,pages_show_list,instagram_basic";
+    // Standard Facebook Login permissions that grant access to connected Instagram Business Accounts
+    const scopes = process.env.INSTAGRAM_SCOPES || "public_profile,pages_show_list,pages_read_engagement";
     return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&state=${encodeURIComponent(state)}&scope=${encodeURIComponent(scopes)}&response_type=code`;
