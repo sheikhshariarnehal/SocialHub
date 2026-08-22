@@ -11,6 +11,14 @@ import {
   Trash2,
   Plus,
   ExternalLink,
+  HelpCircle,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  Smartphone,
+  Globe,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +26,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
@@ -41,16 +50,119 @@ interface PlatformDisplayInfo {
   name: string;
   handle: string;
   color: string;
-  envKey: string;
+  helpText: string;
 }
 
 const SUPPORTED_PLATFORMS: PlatformDisplayInfo[] = [
-  { platform: "Instagram", name: "Instagram", handle: "Connect Instagram", color: "from-pink-500 via-rose-500 to-amber-500", envKey: "INSTAGRAM_CLIENT_ID" },
-  { platform: "LinkedIn", name: "LinkedIn", handle: "Connect LinkedIn", color: "bg-[#0A66C2]", envKey: "LINKEDIN_CLIENT_ID" },
-  { platform: "Twitter", name: "X (Twitter)", handle: "Connect X Account", color: "bg-neutral-900", envKey: "TWITTER_CLIENT_ID" },
-  { platform: "Facebook", name: "Facebook", handle: "Connect Facebook Page", color: "bg-[#1877F2]", envKey: "FACEBOOK_CLIENT_ID" },
-  { platform: "TikTok", name: "TikTok", handle: "Connect TikTok Profile", color: "bg-neutral-900", envKey: "TIKTOK_CLIENT_KEY" },
-  { platform: "YouTube", name: "YouTube", handle: "Connect YouTube Channel", color: "bg-[#FF0000]", envKey: "GOOGLE_CLIENT_ID" },
+  {
+    platform: "Instagram",
+    name: "Instagram",
+    handle: "Connect Instagram Professional",
+    color: "from-pink-500 via-rose-500 to-amber-500",
+    helpText: "Requires an Instagram Business or Creator account linked to a Facebook Page.",
+  },
+  {
+    platform: "LinkedIn",
+    name: "LinkedIn",
+    handle: "Connect LinkedIn Account",
+    color: "bg-[#0A66C2]",
+    helpText: "Direct automated publishing to your personal profile feed & company pages.",
+  },
+  {
+    platform: "Twitter",
+    name: "X (Twitter)",
+    handle: "Connect X Account",
+    color: "bg-neutral-900",
+    helpText: "OAuth 2.0 direct publishing to your X timeline.",
+  },
+  {
+    platform: "Facebook",
+    name: "Facebook",
+    handle: "Connect Facebook Page",
+    color: "bg-[#1877F2]",
+    helpText: "Publishes directly to your Facebook Page (e.g. Nimon Solutions Ltd.).",
+  },
+  {
+    platform: "TikTok",
+    name: "TikTok",
+    handle: "Connect TikTok Profile",
+    color: "bg-neutral-900",
+    helpText: "Direct video publishing to your TikTok creator account.",
+  },
+  {
+    platform: "YouTube",
+    name: "YouTube",
+    handle: "Connect YouTube Channel",
+    color: "bg-[#FF0000]",
+    helpText: "Direct video & Shorts publishing to your YouTube channel.",
+  },
+];
+
+const GUIDES = [
+  {
+    platform: "Instagram",
+    icon: Smartphone,
+    title: "How to Connect Instagram (Business / Creator)",
+    badge: "30 Seconds",
+    steps: [
+      {
+        step: "1",
+        title: "Ensure Professional Account",
+        desc: "In the Instagram mobile app, go to Settings → Account type and tools → Switch to Professional (Creator or Business) Account.",
+      },
+      {
+        step: "2",
+        title: "Link to your Facebook Page",
+        desc: "In Instagram app, tap 'Edit Profile' → under Public business information, tap 'Page' (or 'Facebook: Connect') → Select your Facebook Page (e.g. Nimon Solutions Ltd.).",
+      },
+      {
+        step: "3",
+        title: "Authorize on SocialHub",
+        desc: "Click '+ Connect Instagram' below. In the Meta dialog, choose your Facebook Page and click Continue.",
+      },
+    ],
+  },
+  {
+    platform: "Facebook",
+    icon: Globe,
+    title: "How to Connect Facebook Pages",
+    badge: "Instant",
+    steps: [
+      {
+        step: "1",
+        title: "Have a Facebook Page",
+        desc: "Meta's API permits automated publishing to Facebook Pages (create one free at facebook.com/pages/create if you don't have one).",
+      },
+      {
+        step: "2",
+        title: "Click '+ Connect Facebook'",
+        desc: "In the Meta popup, click 'Edit settings' and check the checkbox next to your Page (e.g. Nimon Solutions Ltd.).",
+      },
+      {
+        step: "3",
+        title: "Publish",
+        desc: "Your Facebook Page is now connected and posts will publish live with full photo & video support.",
+      },
+    ],
+  },
+  {
+    platform: "LinkedIn",
+    icon: Layers,
+    title: "How to Connect LinkedIn",
+    badge: "1-Click",
+    steps: [
+      {
+        step: "1",
+        title: "Click '+ Connect LinkedIn'",
+        desc: "You will be redirected to LinkedIn's official OAuth authorization window.",
+      },
+      {
+        step: "2",
+        title: "Click 'Allow'",
+        desc: "Authorize SocialHub to publish to your personal feed. Photos, native media, and text will publish live!",
+      },
+    ],
+  },
 ];
 
 export default function AccountsSettingsPage() {
@@ -61,6 +173,8 @@ export default function AccountsSettingsPage() {
   const [disconnectModalOpen, setDisconnectModalOpen] = useState(false);
   const [targetAccount, setTargetAccount] = useState<{ id?: string; platform: string; handle: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
+  const [selectedGuidePlatform, setSelectedGuidePlatform] = useState<string | null>(null);
 
   // Handle URL notifications from OAuth callback
   useEffect(() => {
@@ -95,7 +209,6 @@ export default function AccountsSettingsPage() {
   const handleConnect = (platform: string) => {
     const wsId = currentWorkspace?.id || "default_workspace";
     toast.loading(`Redirecting to ${platform} OAuth login...`);
-    // Redirect browser to platform OAuth authorization endpoint
     window.location.href = `/api/social/connect/${platform.toLowerCase()}?workspaceId=${encodeURIComponent(wsId)}`;
   };
 
@@ -127,14 +240,90 @@ export default function AccountsSettingsPage() {
             Connected Accounts
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage authorized social channels for your personal account:{" "}
+            Manage authorized social channels for your workspace:{" "}
             <span className="font-semibold text-foreground">
               {currentWorkspace?.name || "Personal Workspace"}
             </span>
-            .
           </p>
         </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 self-start sm:self-auto"
+          onClick={() => setShowGuide(!showGuide)}
+        >
+          <BookOpen className="h-4 w-4 text-primary" />
+          {showGuide ? "Hide Setup Guide" : "How to Connect Guide"}
+          {showGuide ? (
+            <ChevronUp className="h-3.5 w-3.5 ml-1" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5 ml-1" />
+          )}
+        </Button>
       </div>
+
+      {/* Interactive Setup Guide Banner / Accordion */}
+      {showGuide && (
+        <Card glass className="border-primary/40 bg-gradient-to-br from-primary/5 via-card/60 to-background">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/20 text-primary">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <CardTitle className="text-base font-bold">
+                Step-by-Step Channel Connection Guide
+              </CardTitle>
+            </div>
+            <CardDescription>
+              Clear instructions for connecting Instagram, Facebook Pages, LinkedIn, and X.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+            {GUIDES.map((g) => {
+              const Icon = g.icon;
+              return (
+                <div
+                  key={g.platform}
+                  className="rounded-xl border border-border/70 bg-card/60 p-4 space-y-3 shadow-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-lg bg-accent flex items-center justify-center text-primary">
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
+                      <h4 className="text-xs font-bold text-foreground">
+                        {g.platform}
+                      </h4>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {g.badge}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    {g.steps.map((s) => (
+                      <div key={s.step} className="flex items-start gap-2.5">
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
+                          {s.step}
+                        </span>
+                        <div>
+                          <p className="text-[11px] font-semibold text-foreground">
+                            {s.title}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">
+                            {s.desc}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Grid of Platform Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -151,7 +340,7 @@ export default function AccountsSettingsPage() {
               className={`transition-all duration-200 ${
                 isConnected
                   ? "border-border/80 hover:border-primary/40 shadow-sm"
-                  : "border-dashed opacity-80 hover:opacity-100"
+                  : "border-dashed opacity-90 hover:opacity-100"
               }`}
             >
               <CardHeader className="pb-3">
@@ -194,10 +383,16 @@ export default function AccountsSettingsPage() {
                       {connectedAcc ? connectedAcc.display_name : "Not connected"}
                     </p>
                     <p className="text-[11px] text-muted-foreground truncate">
-                      {connectedAcc ? `@${connectedAcc.display_name?.toLowerCase().replace(/\s+/g, "_")}` : p.handle}
+                      {connectedAcc
+                        ? `@${connectedAcc.display_name?.toLowerCase().replace(/\s+/g, "_")}`
+                        : p.handle}
                     </p>
                   </div>
                 </div>
+
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {p.helpText}
+                </p>
 
                 <div className="rounded-lg border border-border/50 bg-card/40 p-2.5 text-[11px] flex items-center justify-between text-muted-foreground">
                   <span>Status:</span>

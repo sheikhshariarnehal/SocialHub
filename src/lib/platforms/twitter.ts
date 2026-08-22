@@ -7,14 +7,14 @@ import type {
   PlatformComment,
 } from "./adapter";
 
-const DEFAULT_TWITTER_CLIENT_ID = "V0Q0Qm9HU0d0aHEzT2VNOVE4TEg6MTpjaQ";
-const DEFAULT_TWITTER_CLIENT_SECRET = "5Ozz0GaVXaDoT7aNXvW-c-IzZMLREaJ_QSsVOLSiaEDnmEagSU";
-
 export class TwitterAdapter implements PlatformAdapter {
   platform = "twitter" as const;
 
   getAuthorizationUrl(state: string, redirectUri: string): string {
-    const clientId = process.env.TWITTER_CLIENT_ID || DEFAULT_TWITTER_CLIENT_ID;
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    if (!clientId) {
+      return `/api/social/callback/twitter?code=demo_auth_code&state=${encodeURIComponent(state)}`;
+    }
     const scopes = "tweet.read tweet.write users.read offline.access";
     return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
@@ -24,8 +24,8 @@ export class TwitterAdapter implements PlatformAdapter {
   }
 
   async exchangeCodeForTokens(code: string, redirectUri: string): Promise<TokenPair> {
-    const clientId = process.env.TWITTER_CLIENT_ID || DEFAULT_TWITTER_CLIENT_ID;
-    const clientSecret = process.env.TWITTER_CLIENT_SECRET || DEFAULT_TWITTER_CLIENT_SECRET;
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET;
 
     if (clientId && clientSecret && code !== "demo_auth_code") {
       try {
@@ -72,8 +72,8 @@ export class TwitterAdapter implements PlatformAdapter {
   }
 
   async refreshTokens(refreshToken: string): Promise<TokenPair> {
-    const clientId = process.env.TWITTER_CLIENT_ID || DEFAULT_TWITTER_CLIENT_ID;
-    const clientSecret = process.env.TWITTER_CLIENT_SECRET || DEFAULT_TWITTER_CLIENT_SECRET;
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET;
 
     if (clientId && clientSecret && !refreshToken.startsWith("tw_refresh_")) {
       try {
