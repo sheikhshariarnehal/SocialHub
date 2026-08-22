@@ -189,6 +189,100 @@ export class FacebookAdapter implements PlatformAdapter {
         const pageToken = primaryPage.access_token;
         const pageId = primaryPage.id;
 
+        const mediaUrls = payload.mediaUrls || [];
+
+        // 1. If single Video attached -> publish to /videos endpoint
+        if (mediaUrls.length === 1 && /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(mediaUrls[0])) {
+          const videoRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/videos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              file_url: mediaUrls[0],
+              description: payload.content,
+              access_token: pageToken,
+            }),
+          });
+          const videoData = await videoRes.json();
+          if (videoData.id) {
+            return {
+              success: true,
+              externalPostId: videoData.id,
+              externalPostUrl: `https://facebook.com/${videoData.id}`,
+            };
+          } else {
+            return {
+              success: false,
+              errorMessage: videoData.error?.message || "Facebook Video publish rejected.",
+            };
+          }
+        }
+
+        // 2. If single Image attached -> publish to /photos endpoint
+        if (mediaUrls.length === 1) {
+          const photoRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              url: mediaUrls[0],
+              caption: payload.content,
+              access_token: pageToken,
+            }),
+          });
+          const photoData = await photoRes.json();
+          if (photoData.id || photoData.post_id) {
+            const pid = photoData.post_id || photoData.id;
+            return {
+              success: true,
+              externalPostId: pid,
+              externalPostUrl: `https://facebook.com/${pid}`,
+            };
+          } else {
+            return {
+              success: false,
+              errorMessage: photoData.error?.message || "Facebook Photo publish rejected.",
+            };
+          }
+        }
+
+        // 3. If multiple Images attached -> upload unpublished photos, then attach to /feed
+        if (mediaUrls.length > 1) {
+          const attachedMedia = [];
+          for (const url of mediaUrls) {
+            const uploadRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                url,
+                published: false,
+                access_token: pageToken,
+              }),
+            });
+            const uploadData = await uploadRes.json();
+            if (uploadData.id) {
+              attachedMedia.push({ media_fbid: uploadData.id });
+            }
+          }
+
+          const multiRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: payload.content,
+              attached_media: attachedMedia,
+              access_token: pageToken,
+            }),
+          });
+          const multiData = await multiRes.json();
+          if (multiData.id) {
+            return {
+              success: true,
+              externalPostId: multiData.id,
+              externalPostUrl: `https://facebook.com/${multiData.id}`,
+            };
+          }
+        }
+
+        // 4. Default: Text-only post to /feed
         const postRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

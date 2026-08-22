@@ -116,16 +116,28 @@ export class LinkedInAdapter implements PlatformAdapter {
         const authorUrn = profile.sub ? `urn:li:person:${profile.sub}` : null;
 
         if (authorUrn) {
+          const hasMedia = payload.mediaUrls && payload.mediaUrls.length > 0;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const shareContent: any = {
+            shareCommentary: {
+              text: payload.content,
+            },
+            shareMediaCategory: hasMedia ? "ARTICLE" : "NONE",
+          };
+
+          if (hasMedia) {
+            shareContent.media = payload.mediaUrls.map((url) => ({
+              status: "READY",
+              originalUrl: url,
+              title: { text: "Attachment" },
+            }));
+          }
+
           const ugcBody = {
             author: authorUrn,
             lifecycleState: "PUBLISHED",
             specificContent: {
-              "com.linkedin.ugc.ShareContent": {
-                shareCommentary: {
-                  text: payload.content,
-                },
-                shareMediaCategory: "NONE",
-              },
+              "com.linkedin.ugc.ShareContent": shareContent,
             },
             visibility: {
               "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
@@ -151,10 +163,19 @@ export class LinkedInAdapter implements PlatformAdapter {
             };
           } else {
             console.error("LinkedIn publish error response:", postData);
+            return {
+              success: false,
+              errorMessage: postData.message || "LinkedIn rejected post publishing.",
+            };
           }
         }
-      } catch (err) {
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "LinkedIn publishing error";
         console.error("Failed live LinkedIn UGC publish:", err);
+        return {
+          success: false,
+          errorMessage: message,
+        };
       }
     }
 

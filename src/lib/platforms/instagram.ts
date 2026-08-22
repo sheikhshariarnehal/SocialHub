@@ -133,12 +133,18 @@ export class InstagramAdapter implements PlatformAdapter {
         const igId = pageWithIg?.instagram_business_account?.id;
 
         if (igId && payload.mediaUrls && payload.mediaUrls.length > 0) {
-          const mediaRes = await fetch(
-            `https://graph.facebook.com/v19.0/${igId}/media?image_url=${encodeURIComponent(
-              payload.mediaUrls[0]
-            )}&caption=${encodeURIComponent(payload.content)}&access_token=${accessToken}`,
-            { method: "POST" }
-          );
+          const firstMedia = payload.mediaUrls[0];
+          const isVideo = /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(firstMedia);
+
+          const mediaEndpoint = isVideo
+            ? `https://graph.facebook.com/v19.0/${igId}/media?media_type=REELS&video_url=${encodeURIComponent(
+                firstMedia
+              )}&caption=${encodeURIComponent(payload.content)}&access_token=${accessToken}`
+            : `https://graph.facebook.com/v19.0/${igId}/media?image_url=${encodeURIComponent(
+                firstMedia
+              )}&caption=${encodeURIComponent(payload.content)}&access_token=${accessToken}`;
+
+          const mediaRes = await fetch(mediaEndpoint, { method: "POST" });
           const mediaData = await mediaRes.json();
 
           if (mediaData.id) {
@@ -153,11 +159,26 @@ export class InstagramAdapter implements PlatformAdapter {
                 externalPostId: pubData.id,
                 externalPostUrl: `https://instagram.com/p/${pubData.id}`,
               };
+            } else {
+              return {
+                success: false,
+                errorMessage: pubData.error?.message || "Instagram media publish failed.",
+              };
             }
+          } else {
+            return {
+              success: false,
+              errorMessage: mediaData.error?.message || "Instagram container creation failed.",
+            };
           }
         }
-      } catch (err) {
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Instagram publish error";
         console.error("Failed live Instagram publish:", err);
+        return {
+          success: false,
+          errorMessage: message,
+        };
       }
     }
 
