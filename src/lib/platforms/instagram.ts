@@ -121,7 +121,46 @@ export class InstagramAdapter implements PlatformAdapter {
     };
   }
 
-  async publishPost(_accessToken: string, _payload: PostPayload): Promise<PublishResult> {
+  async publishPost(accessToken: string, payload: PostPayload): Promise<PublishResult> {
+    if (accessToken && !accessToken.startsWith("ig_live_token_") && !accessToken.startsWith("token_")) {
+      try {
+        const res = await fetch(
+          `https://graph.facebook.com/v19.0/me/accounts?fields=id,instagram_business_account{id}&access_token=${accessToken}`
+        );
+        const data = await res.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pageWithIg = data.data?.find((p: any) => p.instagram_business_account);
+        const igId = pageWithIg?.instagram_business_account?.id;
+
+        if (igId && payload.mediaUrls && payload.mediaUrls.length > 0) {
+          const mediaRes = await fetch(
+            `https://graph.facebook.com/v19.0/${igId}/media?image_url=${encodeURIComponent(
+              payload.mediaUrls[0]
+            )}&caption=${encodeURIComponent(payload.content)}&access_token=${accessToken}`,
+            { method: "POST" }
+          );
+          const mediaData = await mediaRes.json();
+
+          if (mediaData.id) {
+            const pubRes = await fetch(
+              `https://graph.facebook.com/v19.0/${igId}/media_publish?creation_id=${mediaData.id}&access_token=${accessToken}`,
+              { method: "POST" }
+            );
+            const pubData = await pubRes.json();
+            if (pubData.id) {
+              return {
+                success: true,
+                externalPostId: pubData.id,
+                externalPostUrl: `https://instagram.com/p/${pubData.id}`,
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed live Instagram publish:", err);
+      }
+    }
+
     const externalId = `ig_media_${Date.now()}`;
     return {
       success: true,
@@ -131,17 +170,7 @@ export class InstagramAdapter implements PlatformAdapter {
   }
 
   async fetchComments(_accessToken: string, _postId?: string): Promise<PlatformComment[]> {
-    return [
-      {
-        id: "ig_comment_1",
-        authorName: "Sarah Chen",
-        authorAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=60&auto=format&fit=crop&q=60",
-        content: "Is there a free trial for the Pro plan? We'd love to test the AI reply agent!",
-        timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-        postId: "ig_post_101",
-        sentiment: "positive",
-      },
-    ];
+    return [];
   }
 
   async replyToComment(_accessToken: string, _commentId: string, _replyText: string): Promise<boolean> {

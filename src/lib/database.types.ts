@@ -81,6 +81,8 @@ export interface SocialAccount {
   display_name: string | null;
   avatar_url: string | null;
   status: SocialAccountStatus;
+  access_token?: string | null;
+  refresh_token?: string | null;
   access_token_secret_id: string | null;
   refresh_token_secret_id: string | null;
   token_expires_at: string | null;

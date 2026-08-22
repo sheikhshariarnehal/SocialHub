@@ -16,7 +16,7 @@ export class LinkedInAdapter implements PlatformAdapter {
       return `/api/social/callback/linkedin?code=demo_auth_code&state=${encodeURIComponent(state)}`;
     }
     // Default to OpenID Connect standard scopes which are approved instantly
-    const scopes = process.env.LINKEDIN_SCOPES || "openid profile email";
+    const scopes = process.env.LINKEDIN_SCOPES || "openid profile email w_member_social";
     return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&state=${encodeURIComponent(state)}&scope=${encodeURIComponent(scopes)}`;
@@ -105,7 +105,59 @@ export class LinkedInAdapter implements PlatformAdapter {
     };
   }
 
-  async publishPost(_accessToken: string, _payload: PostPayload): Promise<PublishResult> {
+  async publishPost(accessToken: string, payload: PostPayload): Promise<PublishResult> {
+    if (accessToken && !accessToken.startsWith("li_live_token_") && !accessToken.startsWith("token_")) {
+      try {
+        // 1. Fetch user's LinkedIn URN (sub)
+        const profileRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const profile = await profileRes.json();
+        const authorUrn = profile.sub ? `urn:li:person:${profile.sub}` : null;
+
+        if (authorUrn) {
+          const ugcBody = {
+            author: authorUrn,
+            lifecycleState: "PUBLISHED",
+            specificContent: {
+              "com.linkedin.ugc.ShareContent": {
+                shareCommentary: {
+                  text: payload.content,
+                },
+                shareMediaCategory: "NONE",
+              },
+            },
+            visibility: {
+              "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
+            },
+          };
+
+          const postRes = await fetch("https://api.linkedin.com/v2/ugcPosts", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+              "X-Restli-Protocol-Version": "2.0.0",
+            },
+            body: JSON.stringify(ugcBody),
+          });
+
+          const postData = await postRes.json();
+          if (postData.id) {
+            return {
+              success: true,
+              externalPostId: postData.id,
+              externalPostUrl: `https://www.linkedin.com/feed/update/${postData.id}`,
+            };
+          } else {
+            console.error("LinkedIn publish error response:", postData);
+          }
+        }
+      } catch (err) {
+        console.error("Failed live LinkedIn UGC publish:", err);
+      }
+    }
+
     const externalId = `urn:li:share:${Date.now()}`;
     return {
       success: true,

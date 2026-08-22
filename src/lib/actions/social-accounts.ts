@@ -15,10 +15,12 @@ export async function getWorkspaceAccounts(
   if (!isUuid) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: member } = await (supabase
         .from("workspace_members") as any)
         .select("workspace_id")
         .eq("user_id", user.id)
+        .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
 
@@ -32,6 +34,7 @@ export async function getWorkspaceAccounts(
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase
     .from("social_accounts") as any)
     .select("*")
@@ -65,10 +68,12 @@ export async function connectAccount(
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetWorkspaceId);
 
   if (!isUuid && user) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: member } = await (supabase
       .from("workspace_members") as any)
       .select("workspace_id")
       .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
 
@@ -77,7 +82,8 @@ export async function connectAccount(
     }
   }
 
-  // 3. Upsert social_account record
+  // 3. Upsert social_account record with live access_token and refresh_token
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase
     .from("social_accounts") as any)
     .upsert(
@@ -88,6 +94,8 @@ export async function connectAccount(
         display_name: profile.displayName || profile.handle,
         avatar_url: profile.avatarUrl,
         status: "connected",
+        access_token: tokens.accessToken,
+        refresh_token: tokens.refreshToken,
         token_expires_at: tokens.tokenExpiresAt
           ? tokens.tokenExpiresAt.toISOString()
           : null,
