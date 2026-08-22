@@ -15,7 +15,6 @@ export class LinkedInAdapter implements PlatformAdapter {
     if (!clientId) {
       return `/api/social/callback/linkedin?code=demo_auth_code&state=${encodeURIComponent(state)}`;
     }
-    // Default to OpenID Connect standard scopes which are approved instantly
     const scopes = process.env.LINKEDIN_SCOPES || "openid profile email w_member_social";
     return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
@@ -105,6 +104,76 @@ export class LinkedInAdapter implements PlatformAdapter {
     };
   }
 
+  private async uploadMediaToLinkedIn(
+    accessToken: string,
+    authorUrn: string,
+    mediaUrl: string,
+    isVideo: boolean
+  ): Promise<string | null> {
+    try {
+      // 1. Register Upload with LinkedIn Digital Media API
+      const recipe = isVideo
+        ? "urn:li:digitalmediaRecipe:feedshare-video"
+        : "urn:li:digitalmediaRecipe:feedshare-image";
+
+      const regRes = await fetch("https://api.linkedin.com/v2/assets?action=registerUpload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          registerUploadRequest: {
+            recipes: [recipe],
+            owner: authorUrn,
+            serviceRelationships: [
+              {
+                relationshipType: "OWNER",
+                identifier: "urn:li:userGeneratedContent",
+              },
+            ],
+          },
+        }),
+      });
+
+      const regData = await regRes.json();
+      const uploadUrl =
+        regData.value?.uploadMechanism?.[
+          "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
+        ]?.uploadUrl;
+      const assetUrn = regData.value?.asset;
+
+      if (!uploadUrl || !assetUrn) {
+        console.error("Failed to register LinkedIn upload:", regData);
+        return null;
+      }
+
+      // 2. Fetch binary media file buffer from Supabase/CDN
+      const fileRes = await fetch(mediaUrl);
+      const fileBuffer = await fileRes.arrayBuffer();
+
+      // 3. Upload binary buffer to LinkedIn's DMS URL
+      const upRes = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": isVideo ? "video/mp4" : "image/jpeg",
+        },
+        body: fileBuffer,
+      });
+
+      if (upRes.status >= 200 && upRes.status < 300) {
+        return assetUrn;
+      } else {
+        console.error("LinkedIn binary media upload failed with status:", upRes.status);
+        return null;
+      }
+    } catch (err) {
+      console.error("Error in LinkedIn media upload pipeline:", err);
+      return null;
+    }
+  }
+
   async publishPost(accessToken: string, payload: PostPayload): Promise<PublishResult> {
     if (accessToken && !accessToken.startsWith("li_live_token_") && !accessToken.startsWith("token_")) {
       try {
@@ -116,21 +185,40 @@ export class LinkedInAdapter implements PlatformAdapter {
         const authorUrn = profile.sub ? `urn:li:person:${profile.sub}` : null;
 
         if (authorUrn) {
-          const hasMedia = payload.mediaUrls && payload.mediaUrls.length > 0;
+          const mediaUrls = payload.mediaUrls || [];
+          let shareMediaCategory = "NONE";
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let mediaArray: any[] | undefined = undefined;
+
+          // If media is attached, upload native image or video to LinkedIn DMS
+          if (mediaUrls.length > 0) {
+            const firstUrl = mediaUrls[0];
+            const isVideo = /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(firstUrl);
+            const assetUrn = await this.uploadMediaToLinkedIn(accessToken, authorUrn, firstUrl, isVideo);
+
+            if (assetUrn) {
+              shareMediaCategory = isVideo ? "VIDEO" : "IMAGE";
+              mediaArray = [
+                {
+                  status: "READY",
+                  description: { text: "Post Media" },
+                  media: assetUrn,
+                  title: { text: isVideo ? "Video Post" : "Photo Post" },
+                },
+              ];
+            }
+          }
+
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const shareContent: any = {
             shareCommentary: {
               text: payload.content,
             },
-            shareMediaCategory: hasMedia ? "ARTICLE" : "NONE",
+            shareMediaCategory,
           };
 
-          if (hasMedia) {
-            shareContent.media = payload.mediaUrls.map((url) => ({
-              status: "READY",
-              originalUrl: url,
-              title: { text: "Attachment" },
-            }));
+          if (mediaArray && mediaArray.length > 0) {
+            shareContent.media = mediaArray;
           }
 
           const ugcBody = {
