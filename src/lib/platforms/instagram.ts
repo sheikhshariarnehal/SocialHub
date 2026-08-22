@@ -19,7 +19,7 @@ export class InstagramAdapter implements PlatformAdapter {
     const scopes = process.env.INSTAGRAM_SCOPES || "public_profile,pages_show_list,pages_read_engagement";
     return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}&state=${encodeURIComponent(state)}&scope=${encodeURIComponent(scopes)}&response_type=code`;
+    )}&state=${encodeURIComponent(state)}&scope=${encodeURIComponent(scopes)}&response_type=code&auth_type=rerequest`;
   }
 
   async exchangeCodeForTokens(code: string, redirectUri: string): Promise<TokenPair> {
