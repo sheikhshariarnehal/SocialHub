@@ -101,7 +101,38 @@ export class FacebookAdapter implements PlatformAdapter {
     };
   }
 
-  async publishPost(_accessToken: string, _payload: PostPayload): Promise<PublishResult> {
+  async publishPost(accessToken: string, payload: PostPayload): Promise<PublishResult> {
+    if (accessToken && !accessToken.startsWith("fb_live_token_") && !accessToken.startsWith("token_")) {
+      try {
+        const pagesRes = await fetch(
+          `https://graph.facebook.com/v19.0/me/accounts?access_token=${accessToken}`
+        );
+        const pagesData = await pagesRes.json();
+        const page = pagesData.data?.[0];
+        const targetId = page?.id || "me";
+        const pageToken = page?.access_token || accessToken;
+
+        const postRes = await fetch(`https://graph.facebook.com/v19.0/${targetId}/feed`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: payload.content,
+            access_token: pageToken,
+          }),
+        });
+        const postData = await postRes.json();
+        if (postData.id) {
+          return {
+            success: true,
+            externalPostId: postData.id,
+            externalPostUrl: `https://facebook.com/${postData.id}`,
+          };
+        }
+      } catch (err) {
+        console.error("Facebook live publish error:", err);
+      }
+    }
+
     const externalId = `fb_post_${Date.now()}`;
     return {
       success: true,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Heart,
   MessageCircle,
@@ -25,8 +25,14 @@ export function PlatformPreview({
   selectedPlatforms: string[];
 }) {
   const [activeTab, setActiveTab] = useState(
-    selectedPlatforms[0] || "instagram"
+    selectedPlatforms[0] || "linkedin"
   );
+
+  useEffect(() => {
+    if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(activeTab)) {
+      setActiveTab(selectedPlatforms[0]);
+    }
+  }, [selectedPlatforms, activeTab]);
 
   const displayContent =
     content || "Your post caption will appear here in real-time...";
@@ -35,7 +41,7 @@ export function PlatformPreview({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Live Mock Preview
+          Live Preview
         </span>
 
         {/* Platform switcher tabs */}
@@ -45,18 +51,126 @@ export function PlatformPreview({
           className="w-auto"
         >
           <TabsList className="h-8">
+            <TabsTrigger value="linkedin" className="text-xs px-2.5 py-1">
+              LinkedIn
+            </TabsTrigger>
+            <TabsTrigger value="facebook" className="text-xs px-2.5 py-1">
+              Facebook
+            </TabsTrigger>
             <TabsTrigger value="instagram" className="text-xs px-2.5 py-1">
               Instagram
             </TabsTrigger>
             <TabsTrigger value="twitter" className="text-xs px-2.5 py-1">
               X (Twitter)
             </TabsTrigger>
-            <TabsTrigger value="linkedin" className="text-xs px-2.5 py-1">
-              LinkedIn
-            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
+
+      {/* LinkedIn Preview */}
+      {activeTab === "linkedin" && (
+        <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-lg max-w-sm mx-auto space-y-3 animate-in fade-in-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Avatar
+                src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=80"
+                name="Sheikh Shariar Nehal"
+                size="md"
+              />
+              <div>
+                <p className="text-xs font-bold text-foreground leading-none">
+                  Sheikh Shariar Nehal
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Software Engineer • Just now
+                </p>
+              </div>
+            </div>
+            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+          </div>
+
+          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
+            {displayContent}
+          </p>
+
+          {media.length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-border/60 aspect-video bg-neutral-950">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={media[0].url}
+                alt="LinkedIn media"
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-between border-t border-border/40 pt-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1 hover:text-[#0A66C2] cursor-pointer transition-colors">
+              <ThumbsUp className="h-3.5 w-3.5 text-[#0A66C2]" /> Like
+            </span>
+            <span className="flex items-center gap-1 hover:text-foreground cursor-pointer transition-colors">
+              <MessageCircle className="h-3.5 w-3.5" /> Comment
+            </span>
+            <span className="flex items-center gap-1 hover:text-foreground cursor-pointer transition-colors">
+              <Repeat2 className="h-3.5 w-3.5" /> Repost
+            </span>
+            <span className="flex items-center gap-1 hover:text-foreground cursor-pointer transition-colors">
+              <Send className="h-3.5 w-3.5" /> Send
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Facebook Preview */}
+      {activeTab === "facebook" && (
+        <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-lg max-w-sm mx-auto space-y-3 animate-in fade-in-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Avatar
+                src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=80"
+                name="Facebook Page"
+                size="md"
+              />
+              <div>
+                <p className="text-xs font-bold text-foreground leading-none">
+                  শেখ শাহরিয়ার নেহাল
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Just now • 🌍 Public
+                </p>
+              </div>
+            </div>
+            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+          </div>
+
+          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
+            {displayContent}
+          </p>
+
+          {media.length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-border/60 aspect-video bg-neutral-950">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={media[0].url}
+                alt="Facebook media"
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-around border-t border-border/40 pt-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1 text-[#1877F2] font-semibold cursor-pointer">
+              <ThumbsUp className="h-3.5 w-3.5" /> Like
+            </span>
+            <span className="flex items-center gap-1 hover:text-foreground cursor-pointer">
+              <MessageCircle className="h-3.5 w-3.5" /> Comment
+            </span>
+            <span className="flex items-center gap-1 hover:text-foreground cursor-pointer">
+              <Share className="h-3.5 w-3.5" /> Share
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Instagram Preview */}
       {activeTab === "instagram" && (
@@ -66,11 +180,11 @@ export function PlatformPreview({
             <div className="flex items-center gap-2.5">
               <Avatar
                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80"
-                name="Acme"
+                name="Instagram User"
                 size="sm"
               />
               <div>
-                <p className="text-xs font-bold text-foreground">acmedesign</p>
+                <p className="text-xs font-bold text-foreground">socialhub_creator</p>
                 <p className="text-[10px] text-muted-foreground">Original audio</p>
               </div>
             </div>
@@ -104,18 +218,18 @@ export function PlatformPreview({
               <Bookmark className="h-5 w-5 text-foreground" />
             </div>
 
-            <p className="text-[11px] font-bold text-foreground">1,248 likes</p>
+            <p className="text-[11px] font-bold text-foreground">248 likes</p>
 
             {/* Caption */}
             <div className="text-xs leading-relaxed">
-              <span className="font-bold mr-1.5 text-foreground">acmedesign</span>
+              <span className="font-bold mr-1.5 text-foreground">socialhub_creator</span>
               <span className="text-muted-foreground whitespace-pre-wrap">
                 {displayContent}
               </span>
             </div>
 
             <p className="text-[10px] text-muted-foreground/60 uppercase">
-              2 hours ago
+              Just now
             </p>
           </div>
         </div>
@@ -127,16 +241,16 @@ export function PlatformPreview({
           <div className="flex items-start gap-3">
             <Avatar
               src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80"
-              name="Acme HQ"
+              name="SocialHub User"
               size="sm"
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-bold text-foreground truncate">
-                  Acme HQ
+                  SocialHub User
                 </span>
                 <span className="text-[11px] text-muted-foreground">
-                  @acme_hq · 1m
+                  @socialhub · 1m
                 </span>
               </div>
               <p className="text-xs leading-relaxed text-foreground mt-1 whitespace-pre-wrap">
@@ -170,60 +284,6 @@ export function PlatformPreview({
                 </span>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* LinkedIn Preview */}
-      {activeTab === "linkedin" && (
-        <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-lg max-w-sm mx-auto space-y-3 animate-in fade-in-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Avatar
-                src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=80"
-                name="Acme Agency"
-                size="md"
-              />
-              <div>
-                <p className="text-xs font-bold text-foreground leading-none">
-                  Acme Agency Inc.
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  14,200 followers • Promoted
-                </p>
-              </div>
-            </div>
-            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-          </div>
-
-          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
-            {displayContent}
-          </p>
-
-          {media.length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-border/60 aspect-video bg-neutral-950">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={media[0].url}
-                alt="LinkedIn media"
-                className="h-full w-full object-cover"
-              />
-            </div>
-          )}
-
-          <div className="flex items-center justify-between border-t border-border/40 pt-2 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <ThumbsUp className="h-3.5 w-3.5 text-[#0A66C2]" /> Like
-            </span>
-            <span className="flex items-center gap-1">
-              <MessageCircle className="h-3.5 w-3.5" /> Comment
-            </span>
-            <span className="flex items-center gap-1">
-              <Repeat2 className="h-3.5 w-3.5" /> Repost
-            </span>
-            <span className="flex items-center gap-1">
-              <Send className="h-3.5 w-3.5" /> Send
-            </span>
           </div>
         </div>
       )}
