@@ -19,7 +19,7 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         brand:
-          "bg-gradient-to-r from-[oklch(0.68_0.20_268)] to-[oklch(0.60_0.24_290)] text-white shadow-md hover:brightness-110 hover:shadow-lg",
+          "bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 hover:shadow-md active:scale-[0.98]",
         glass:
           "bg-card/40 backdrop-blur-md border border-border/50 text-foreground hover:bg-card/70 hover:border-border",
       },
