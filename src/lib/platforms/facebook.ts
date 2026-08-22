@@ -15,8 +15,7 @@ export class FacebookAdapter implements PlatformAdapter {
     if (!clientId) {
       return `/api/social/callback/facebook?code=demo_auth_code&state=${encodeURIComponent(state)}`;
     }
-    // Default to public_profile and pages_show_list which are valid in Meta dev mode
-    const scopes = process.env.FACEBOOK_SCOPES || "public_profile,pages_show_list,pages_read_engagement";
+    const scopes = process.env.FACEBOOK_SCOPES || "public_profile,pages_show_list,pages_read_engagement,pages_manage_posts";
     return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&state=${encodeURIComponent(state)}&scope=${encodeURIComponent(scopes)}&response_type=code&auth_type=rerequest`;
@@ -72,26 +71,83 @@ export class FacebookAdapter implements PlatformAdapter {
     };
   }
 
+  private async resolvePages(accessToken: string): Promise<Array<{ id: string; name: string; access_token: string; picture?: string }>> {
+    const pages: Array<{ id: string; name: string; access_token: string; picture?: string }> = [];
+
+    try {
+      // 1. Try standard /me/accounts
+      const res = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,picture.type(large)&access_token=${accessToken}`
+      );
+      const data = await res.json();
+      if (Array.isArray(data.data) && data.data.length > 0) {
+        for (const p of data.data) {
+          pages.push({
+            id: p.id,
+            name: p.name,
+            access_token: p.access_token || accessToken,
+            picture: p.picture?.data?.url,
+          });
+        }
+      }
+
+      // 2. If /me/accounts is empty (Business portfolio pages), inspect debug_token target_ids
+      if (pages.length === 0) {
+        const clientId = process.env.FACEBOOK_CLIENT_ID || process.env.INSTAGRAM_CLIENT_ID;
+        const clientSecret = process.env.FACEBOOK_CLIENT_SECRET || process.env.INSTAGRAM_CLIENT_SECRET;
+
+        if (clientId && clientSecret) {
+          const debugRes = await fetch(
+            `https://graph.facebook.com/debug_token?input_token=${accessToken}&access_token=${clientId}|${clientSecret}`
+          );
+          const debugData = await debugRes.json();
+          const granular = debugData.data?.granular_scopes || [];
+          const targetIds = new Set<string>();
+
+          for (const g of granular) {
+            if (Array.isArray(g.target_ids)) {
+              g.target_ids.forEach((id: string) => targetIds.add(id));
+            }
+          }
+
+          for (const pageId of targetIds) {
+            const pageRes = await fetch(
+              `https://graph.facebook.com/v19.0/${pageId}?fields=id,name,access_token,picture.type(large)&access_token=${accessToken}`
+            );
+            const pageData = await pageRes.json();
+            if (pageData.id && pageData.name) {
+              pages.push({
+                id: pageData.id,
+                name: pageData.name,
+                access_token: pageData.access_token || accessToken,
+                picture: pageData.picture?.data?.url,
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error resolving Facebook pages:", err);
+    }
+
+    return pages;
+  }
+
   async getProfile(accessToken: string): Promise<PlatformProfile> {
     if (accessToken && !accessToken.startsWith("fb_live_token_")) {
       try {
-        // 1. Fetch user's pages to find primary page if any
-        const pagesRes = await fetch(
-          `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,picture.type(large)&access_token=${accessToken}`
-        );
-        const pagesData = await pagesRes.json();
-        const firstPage = pagesData.data?.[0];
-
-        if (firstPage?.id) {
+        const pages = await this.resolvePages(accessToken);
+        if (pages.length > 0) {
+          const primaryPage = pages[0];
           return {
-            id: firstPage.id,
-            displayName: firstPage.name,
-            handle: `@${firstPage.name?.toLowerCase().replace(/\s+/g, "_")}`,
-            avatarUrl: firstPage.picture?.data?.url || null,
+            id: primaryPage.id,
+            displayName: primaryPage.name,
+            handle: `@${primaryPage.name.toLowerCase().replace(/\s+/g, "_")}`,
+            avatarUrl: primaryPage.picture || null,
           };
         }
 
-        // 2. Fallback to personal profile
+        // Fallback to personal profile name
         const res = await fetch(
           `https://graph.facebook.com/v19.0/me?fields=id,name,picture.type(large)&access_token=${accessToken}`
         );
@@ -99,7 +155,7 @@ export class FacebookAdapter implements PlatformAdapter {
         if (data.id) {
           return {
             id: data.id,
-            displayName: data.name || "Facebook Page",
+            displayName: data.name,
             handle: `@${data.name?.toLowerCase().replace(/\s+/g, "_")}`,
             avatarUrl: data.picture?.data?.url || null,
           };
@@ -121,23 +177,19 @@ export class FacebookAdapter implements PlatformAdapter {
   async publishPost(accessToken: string, payload: PostPayload): Promise<PublishResult> {
     if (accessToken && !accessToken.startsWith("fb_live_token_") && !accessToken.startsWith("token_")) {
       try {
-        const pagesRes = await fetch(
-          `https://graph.facebook.com/v19.0/me/accounts?access_token=${accessToken}`
-        );
-        const pagesData = await pagesRes.json();
-        const page = pagesData.data?.[0];
-
-        if (!page) {
+        const pages = await this.resolvePages(accessToken);
+        if (pages.length === 0) {
           return {
             success: false,
-            errorMessage: "No Facebook Page found. Meta Graph API only permits posting to Facebook Pages, not personal profile timelines.",
+            errorMessage: "No Facebook Page found. Meta Graph API requires an authorized Facebook Page to publish posts.",
           };
         }
 
-        const targetId = page.id;
-        const pageToken = page.access_token || accessToken;
+        const primaryPage = pages[0];
+        const pageToken = primaryPage.access_token;
+        const pageId = primaryPage.id;
 
-        const postRes = await fetch(`https://graph.facebook.com/v19.0/${targetId}/feed`, {
+        const postRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -145,6 +197,7 @@ export class FacebookAdapter implements PlatformAdapter {
             access_token: pageToken,
           }),
         });
+
         const postData = await postRes.json();
         if (postData.id) {
           return {
@@ -153,9 +206,10 @@ export class FacebookAdapter implements PlatformAdapter {
             externalPostUrl: `https://facebook.com/${postData.id}`,
           };
         } else {
+          const errorMsg = postData.error?.message || "Facebook Graph API rejected the post.";
           return {
             success: false,
-            errorMessage: postData.error?.message || "Facebook Graph API rejected the post.",
+            errorMessage: errorMsg,
           };
         }
       } catch (err: unknown) {
