@@ -36,7 +36,16 @@ export async function GET(
 
   if (stateStr) {
     try {
-      const state = JSON.parse(stateStr);
+      let decoded = stateStr;
+      try {
+        const candidate = Buffer.from(stateStr, "base64url").toString("utf-8");
+        if (candidate.startsWith("{")) {
+          decoded = candidate;
+        }
+      } catch {
+        // use raw stateStr
+      }
+      const state = JSON.parse(decoded);
       if (state.workspaceId) workspaceId = state.workspaceId;
       if (state.codeVerifier) codeVerifier = state.codeVerifier;
     } catch {

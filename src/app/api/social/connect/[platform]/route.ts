@@ -29,11 +29,12 @@ export async function GET(
       codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("base64url");
     }
 
-    const state = JSON.stringify({
+    const stateObj = {
       workspaceId,
       codeVerifier,
       timestamp: Date.now(),
-    });
+    };
+    const state = Buffer.from(JSON.stringify(stateObj)).toString("base64url");
 
     const adapter = getPlatformAdapter(platformKey);
     const authUrl = adapter.getAuthorizationUrl(state, redirectUri, codeChallenge);
