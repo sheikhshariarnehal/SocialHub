@@ -32,22 +32,27 @@ export async function GET(
   }
 
   let workspaceId = "default";
+  let codeVerifier: string | undefined = request.cookies.get("twitter_oauth_verifier")?.value;
+
   if (stateStr) {
     try {
       const state = JSON.parse(stateStr);
-      workspaceId = state.workspaceId;
+      if (state.workspaceId) workspaceId = state.workspaceId;
+      if (state.codeVerifier) codeVerifier = state.codeVerifier;
     } catch {
       // ignore
     }
   }
 
-  const redirectUri = `${requestUrl.origin}/api/social/callback/${platform}`;
+  const platformKey = platform.toLowerCase() as PlatformType;
+  const redirectUri = `${requestUrl.origin}/api/social/callback/${platformKey}`;
 
   const res = await connectAccount(
     workspaceId,
-    platform as PlatformType,
+    platformKey,
     code,
-    redirectUri
+    redirectUri,
+    codeVerifier
   );
 
   if (res.error) {
@@ -56,7 +61,13 @@ export async function GET(
     );
   }
 
-  return NextResponse.redirect(
-    new URL(`/settings/accounts?success=${platform}`, request.url)
+  const response = NextResponse.redirect(
+    new URL(`/settings/accounts?success=${platformKey}`, request.url)
   );
+
+  if (request.cookies.has("twitter_oauth_verifier")) {
+    response.cookies.delete("twitter_oauth_verifier");
+  }
+
+  return response;
 }

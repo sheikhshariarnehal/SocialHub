@@ -10,20 +10,25 @@ import type {
 export class TwitterAdapter implements PlatformAdapter {
   platform = "twitter" as const;
 
-  getAuthorizationUrl(state: string, redirectUri: string): string {
+  getAuthorizationUrl(state: string, redirectUri: string, codeChallenge?: string): string {
     const clientId = process.env.TWITTER_CLIENT_ID;
     if (!clientId) {
       return `/api/social/callback/twitter?code=demo_auth_code&state=${encodeURIComponent(state)}`;
     }
     const scopes = "tweet.read tweet.write users.read offline.access";
+    const challenge = codeChallenge || "SocialHubVerifierPKCEChallengeForTwitterOAuth20App";
     return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(
       state
-    )}&code_challenge=challenge&code_challenge_method=plain`;
+    )}&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=S256`;
   }
 
-  async exchangeCodeForTokens(code: string, redirectUri: string): Promise<TokenPair> {
+  async exchangeCodeForTokens(
+    code: string,
+    redirectUri: string,
+    codeVerifier?: string
+  ): Promise<TokenPair> {
     const clientId = process.env.TWITTER_CLIENT_ID;
     const clientSecret = process.env.TWITTER_CLIENT_SECRET;
 
@@ -34,7 +39,7 @@ export class TwitterAdapter implements PlatformAdapter {
           code,
           grant_type: "authorization_code",
           redirect_uri: redirectUri,
-          code_verifier: "challenge",
+          code_verifier: codeVerifier || "SocialHubVerifierPKCEChallengeForTwitterOAuth20App",
         });
 
         const res = await fetch("https://api.twitter.com/2/oauth2/token", {
@@ -57,9 +62,14 @@ export class TwitterAdapter implements PlatformAdapter {
           };
         } else {
           console.error("Twitter token response error:", data);
+          const errorMsg =
+            data.error_description || data.error || data.detail || "Failed to exchange Twitter authorization code for tokens.";
+          throw new Error(errorMsg);
         }
-      } catch (err) {
-        console.error("Failed live Twitter OAuth exchange:", err);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed live Twitter OAuth exchange";
+        console.error("Failed live Twitter OAuth exchange:", message);
+        throw new Error(message);
       }
     }
 

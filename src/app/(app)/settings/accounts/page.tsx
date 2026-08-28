@@ -164,6 +164,29 @@ const GUIDES = [
       },
     ],
   },
+  {
+    platform: "Twitter",
+    icon: Share2,
+    title: "How to Connect X (Twitter)",
+    badge: "OAuth 2.0 PKCE",
+    steps: [
+      {
+        step: "1",
+        title: "Twitter Developer Setup",
+        desc: "In Twitter Developer Portal, set App type to 'Web App' (Confidential Client) with 'Read and write' permissions.",
+      },
+      {
+        step: "2",
+        title: "Configure Callback URL",
+        desc: "Add your callback URL: http://localhost:3000/api/social/callback/twitter (or production domain URL).",
+      },
+      {
+        step: "3",
+        title: "Authorize on SocialHub",
+        desc: "Click 'Connect Twitter' below to grant SocialHub publishing and profile permissions.",
+      },
+    ],
+  },
 ];
 
 export default function AccountsSettingsPage() {
@@ -280,7 +303,7 @@ export default function AccountsSettingsPage() {
               Clear instructions for connecting Instagram, Facebook Pages, LinkedIn, and X.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
             {GUIDES.map((g) => {
               const Icon = g.icon;
               return (

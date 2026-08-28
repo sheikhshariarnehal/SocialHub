@@ -49,13 +49,14 @@ export async function connectAccount(
   workspaceId: string,
   platform: PlatformType,
   code: string,
-  redirectUri: string
+  redirectUri: string,
+  codeVerifier?: string
 ) {
   const supabase = await createClient();
   const adapter = getPlatformAdapter(platform);
 
   // 1. Exchange code for tokens
-  const tokens = await adapter.exchangeCodeForTokens(code, redirectUri);
+  const tokens = await adapter.exchangeCodeForTokens(code, redirectUri, codeVerifier);
   // 2. Fetch profile from platform
   const profile = await adapter.getProfile(tokens.accessToken);
 

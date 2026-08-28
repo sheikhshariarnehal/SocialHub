@@ -45,8 +45,8 @@ export interface PlatformComment {
 
 export interface PlatformAdapter {
   platform: PlatformType;
-  getAuthorizationUrl(state: string, redirectUri: string): string;
-  exchangeCodeForTokens(code: string, redirectUri: string): Promise<TokenPair>;
+  getAuthorizationUrl(state: string, redirectUri: string, codeChallenge?: string): string;
+  exchangeCodeForTokens(code: string, redirectUri: string, codeVerifier?: string): Promise<TokenPair>;
   refreshTokens(refreshToken: string): Promise<TokenPair>;
   getProfile(accessToken: string): Promise<PlatformProfile>;
   publishPost(accessToken: string, payload: PostPayload): Promise<PublishResult>;
