@@ -17,7 +17,7 @@ export class TwitterAdapter implements PlatformAdapter {
     }
     const scopes = "tweet.read tweet.write users.read offline.access";
     const challenge = codeChallenge || "SocialHubVerifierPKCEChallengeForTwitterOAuth20App";
-    return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+    return `https://x.com/i/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(
       state
