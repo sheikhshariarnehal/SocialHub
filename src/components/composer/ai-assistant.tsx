@@ -35,7 +35,8 @@ const TONES = [
 ];
 
 const TOP_NVIDIA_QUICK_MODELS = [
-  { id: "nvidia/nemotron-3.5-lightning-30b-a3b", name: "Nemotron 3.5 Lightning (Default)" },
+  { id: "deepseek-ai/deepseek-v4-flash-0731", name: "DeepSeek V4 Flash (Default)" },
+  { id: "nvidia/nemotron-3.5-lightning-30b-a3b", name: "Nemotron 3.5 Lightning" },
   { id: "moonshotai/kimi-k3", name: "Moonshot Kimi K3" },
   { id: "meta/llama-3.3-70b-instruct", name: "Meta Llama 3.3 70B" },
   { id: "deepseek-ai/deepseek-r1", name: "DeepSeek R1 (NVIDIA)" },

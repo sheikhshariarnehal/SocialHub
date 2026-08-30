@@ -29,13 +29,12 @@ export interface ModelPreset {
 }
 
 export const NVIDIA_POPULAR_MODELS: ModelPreset[] = [
-  { id: "nvidia/nemotron-3.5-lightning-30b-a3b", name: "NVIDIA: Nemotron 3.5 Lightning", badge: "Default", desc: "Ultra-fast reasoning model with 16k tokens on NVIDIA NIM", context: "16k", speed: "Ultra Fast" },
+  { id: "deepseek-ai/deepseek-v4-flash-0731", name: "DeepSeek: V4 Flash", badge: "Default", desc: "Next-gen ultra-fast flash model on NVIDIA NIM", context: "16k", speed: "Ultra Fast" },
+  { id: "nvidia/nemotron-3.5-lightning-30b-a3b", name: "NVIDIA: Nemotron 3.5 Lightning", badge: "Fast", desc: "High throughput reasoning model on NVIDIA NIM", context: "16k", speed: "Ultra Fast" },
   { id: "moonshotai/kimi-k3", name: "Moonshot: Kimi K3", badge: "Multimodal", desc: "Flagship multimodal & deep reasoning model on NVIDIA NIM", context: "16k", speed: "High" },
-  { id: "meta/llama-3.3-70b-instruct", name: "Meta: Llama 3.3 70B", badge: "Fast", desc: "Fast open instruction-tuned model", context: "128k", speed: "Ultra Fast" },
-  { id: "nvidia/nemotron-4-340b-instruct", name: "NVIDIA: Nemotron 4 340B", badge: "Flagship", desc: "NVIDIA's massive 340B enterprise model", context: "4k" },
+  { id: "meta/llama-3.3-70b-instruct", name: "Meta: Llama 3.3 70B", badge: "Open Source", desc: "Fast open instruction-tuned model", context: "128k", speed: "Ultra Fast" },
   { id: "deepseek-ai/deepseek-r1", name: "DeepSeek: R1 (NVIDIA NIM)", badge: "Reasoning", desc: "Deep reasoning hosted on NVIDIA infrastructure" },
-  { id: "mistralai/mixtral-8x22b-instruct-v0.1", name: "Mistral: Mixtral 8x22B", badge: "MoE", desc: "High-throughput Mixture-of-Experts architecture" },
-  { id: "microsoft/phi-3.5-vision-instruct", name: "Microsoft: Phi-3.5 Vision", badge: "Vision", desc: "Multimodal image & vision comprehension model" },
+  { id: "nvidia/nemotron-4-340b-instruct", name: "NVIDIA: Nemotron 4 340B", badge: "Flagship", desc: "NVIDIA's massive 340B enterprise model", context: "4k" },
 ];
 
 export const OPENROUTER_FREE_MODELS: ModelPreset[] = [
@@ -90,14 +89,14 @@ export const GEMINI_POPULAR_MODELS: ModelPreset[] = [
 export const INITIAL_AI_PROVIDERS: AIProviderItem[] = [
   {
     id: "p-nvidia",
-    name: "NVIDIA NIM / Nemotron",
+    name: "NVIDIA NIM / DeepSeek V4",
     type: "BYO Key",
     providerType: "nvidia",
-    defaultModel: "nvidia/nemotron-3.5-lightning-30b-a3b",
+    defaultModel: "deepseek-ai/deepseek-v4-flash-0731",
     status: "active",
     isDefault: true,
-    apiKey: "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",
-    apiKeyMasked: "nvap...bjaQ",
+    apiKey: "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",
+    apiKeyMasked: "nvap...81r",
     latency: "140ms",
     baseUrl: "https://integrate.api.nvidia.com/v1",
   },
@@ -266,18 +265,20 @@ export const useAIProvidersStore = create<AIProvidersState>()(
           return currentState;
         }
 
-        // Merge any new providers (like p-nvidia) into existing stored state
+        // Merge any new providers into existing stored state
         const storedProviders: AIProviderItem[] = persistedState.providers;
         const mergedProviders = currentState.providers.map((init) => {
           const found = storedProviders.find((sp) => sp.id === init.id);
-          // If nvidia is present, ensure defaultModel is nvidia/nemotron-3.5-lightning-30b-a3b if updated
+          // If nvidia is present, ensure defaultModel is deepseek-ai/deepseek-v4-flash-0731 if updated
           if (init.id === "p-nvidia") {
             return {
               ...init,
               ...(found || {}),
-              defaultModel: found?.defaultModel || init.defaultModel,
-              apiKey: found?.apiKey || init.apiKey,
-              apiKeyMasked: found?.apiKeyMasked || init.apiKeyMasked,
+              defaultModel: init.defaultModel,
+              apiKey: init.apiKey,
+              apiKeyMasked: init.apiKeyMasked,
+              status: "active",
+              isDefault: true,
             };
           }
           return found || init;

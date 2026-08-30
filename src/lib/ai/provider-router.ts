@@ -74,20 +74,20 @@ Requirements:
 }
 
 /**
- * NVIDIA NIM API caller (e.g. nvidia/nemotron-3.5-lightning-30b-a3b, moonshotai/kimi-k3)
+ * NVIDIA NIM API caller (e.g. deepseek-ai/deepseek-v4-flash-0731, nvidia/nemotron-3.5-lightning-30b-a3b)
  */
 async function callNvidia(
   apiKey: string,
-  model: string = "nvidia/nemotron-3.5-lightning-30b-a3b",
+  model: string = "deepseek-ai/deepseek-v4-flash-0731",
   systemPrompt: string,
   userPrompt: string
 ): Promise<{ text: string; tokensUsed: number }> {
   const endpoint = "https://integrate.api.nvidia.com/v1/chat/completions";
-  const selectedModel = model?.trim() || "nvidia/nemotron-3.5-lightning-30b-a3b";
+  const selectedModel = model?.trim() || "deepseek-ai/deepseek-v4-flash-0731";
   const activeKey =
     apiKey?.trim() ||
     process.env.NVIDIA_API_KEY ||
-    "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";
+    "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";
 
   const res = await fetch(endpoint, {
     method: "POST",
@@ -102,8 +102,9 @@ async function callNvidia(
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 1024,
+      max_tokens: 1500,
       chat_template_kwargs: {
+        thinking: false,
         enable_thinking: false,
       },
     }),
@@ -119,7 +120,12 @@ async function callNvidia(
   }
 
   const data = await res.json();
-  const rawText = data.choices?.[0]?.message?.content?.trim() || "";
+  const messageObj = data.choices?.[0]?.message;
+  const rawText =
+    messageObj?.content ||
+    messageObj?.reasoning_content ||
+    messageObj?.reasoning ||
+    "";
   const text = cleanSocialPostOutput(rawText);
   const tokensUsed = data.usage?.total_tokens || 180;
   return { text, tokensUsed };
@@ -364,14 +370,14 @@ export async function generateContent(
   const systemPrompt = buildSystemPrompt(action, tone);
   const userPrompt = prompt?.trim() || "Social media insights and best practices";
 
-  // 1. NVIDIA NIM (nvidia/nemotron-3.5-lightning-30b-a3b, moonshotai/kimi-k3, etc.)
+  // 1. NVIDIA NIM (deepseek-ai/deepseek-v4-flash-0731, nemotron, etc.)
   if (provider === "nvidia") {
     try {
-      const selectedModel = model || "nvidia/nemotron-3.5-lightning-30b-a3b";
+      const selectedModel = model || "deepseek-ai/deepseek-v4-flash-0731";
       const keyToUse =
         apiKey ||
         process.env.NVIDIA_API_KEY ||
-        "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";
+        "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";
       const result = await callNvidia(keyToUse, selectedModel, systemPrompt, userPrompt);
       return {
         text: result.text,
@@ -455,14 +461,14 @@ export async function generateContent(
     try {
       const result = await callNvidia(
         serverNvidiaKey,
-        "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "deepseek-ai/deepseek-v4-flash-0731",
         systemPrompt,
         userPrompt
       );
       return {
         text: result.text,
         providerUsed: "SocialHub AI Core (NVIDIA NIM)",
-        modelUsed: "nvidia/nemotron-3.5-lightning-30b-a3b",
+        modelUsed: "deepseek-ai/deepseek-v4-flash-0731",
         tokensUsed: result.tokensUsed,
       };
     } catch (err) {
