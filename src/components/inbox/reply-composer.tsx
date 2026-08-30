@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Send, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useAIProvidersStore } from "@/hooks/use-ai-providers";
 
 export function ReplyComposer({
   parentAuthor,
@@ -17,6 +18,9 @@ export function ReplyComposer({
   onSend: (replyText: string) => Promise<void>;
   onCancel: () => void;
 }) {
+  const { getActiveProvider } = useAIProvidersStore();
+  const activeProvider = getActiveProvider();
+
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -30,12 +34,18 @@ export function ReplyComposer({
         body: JSON.stringify({
           action: "reply",
           prompt: `Reply to ${parentAuthor}: "${parentContent}"`,
+          provider: activeProvider.providerType,
+          apiKey: activeProvider.apiKey,
+          model: activeProvider.defaultModel,
+          baseUrl: activeProvider.baseUrl,
         }),
       });
       const data = await res.json();
       if (data.generatedText) {
         setText(data.generatedText);
-        toast.success("AI reply draft generated!");
+        toast.success(`AI reply generated with ${data.providerUsed}!`);
+      } else if (data.error) {
+        toast.error(data.error);
       }
     } catch {
       setText(`Thanks @${parentAuthor}! Great point — we appreciate your feedback! 🙌`);
