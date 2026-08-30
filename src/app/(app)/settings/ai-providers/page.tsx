@@ -267,13 +267,13 @@ export default function AiProvidersSettingsPage() {
   }, [selectedProvider, modelTab, modelSearchQuery, liveModels]);
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 animate-in fade-in-50">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl font-extrabold tracking-tight">
           AI Providers
         </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <p className="text-sm text-muted-foreground mt-1">
           Connect NVIDIA NIM, OpenRouter, OpenAI, or Gemini for direct model execution with zero markup.
         </p>
       </div>
