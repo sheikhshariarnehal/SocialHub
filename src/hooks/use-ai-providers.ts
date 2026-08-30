@@ -29,7 +29,8 @@ export interface ModelPreset {
 }
 
 export const NVIDIA_POPULAR_MODELS: ModelPreset[] = [
-  { id: "moonshotai/kimi-k3", name: "Moonshot: Kimi K3", badge: "Default", desc: "Flagship multimodal & deep reasoning model on NVIDIA NIM", context: "16k", speed: "High" },
+  { id: "nvidia/nemotron-3.5-lightning-30b-a3b", name: "NVIDIA: Nemotron 3.5 Lightning", badge: "Default", desc: "Ultra-fast reasoning model with 16k tokens on NVIDIA NIM", context: "16k", speed: "Ultra Fast" },
+  { id: "moonshotai/kimi-k3", name: "Moonshot: Kimi K3", badge: "Multimodal", desc: "Flagship multimodal & deep reasoning model on NVIDIA NIM", context: "16k", speed: "High" },
   { id: "meta/llama-3.3-70b-instruct", name: "Meta: Llama 3.3 70B", badge: "Fast", desc: "Fast open instruction-tuned model", context: "128k", speed: "Ultra Fast" },
   { id: "nvidia/nemotron-4-340b-instruct", name: "NVIDIA: Nemotron 4 340B", badge: "Flagship", desc: "NVIDIA's massive 340B enterprise model", context: "4k" },
   { id: "deepseek-ai/deepseek-r1", name: "DeepSeek: R1 (NVIDIA NIM)", badge: "Reasoning", desc: "Deep reasoning hosted on NVIDIA infrastructure" },
@@ -89,15 +90,15 @@ export const GEMINI_POPULAR_MODELS: ModelPreset[] = [
 export const INITIAL_AI_PROVIDERS: AIProviderItem[] = [
   {
     id: "p-nvidia",
-    name: "NVIDIA NIM / Moonshot",
+    name: "NVIDIA NIM / Nemotron",
     type: "BYO Key",
     providerType: "nvidia",
-    defaultModel: "moonshotai/kimi-k3",
+    defaultModel: "nvidia/nemotron-3.5-lightning-30b-a3b",
     status: "active",
     isDefault: true,
-    apiKey: "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",
-    apiKeyMasked: "nvap...VCSz",
-    latency: "165ms",
+    apiKey: "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",
+    apiKeyMasked: "nvap...bjaQ",
+    latency: "140ms",
     baseUrl: "https://integrate.api.nvidia.com/v1",
   },
   {
@@ -269,6 +270,16 @@ export const useAIProvidersStore = create<AIProvidersState>()(
         const storedProviders: AIProviderItem[] = persistedState.providers;
         const mergedProviders = currentState.providers.map((init) => {
           const found = storedProviders.find((sp) => sp.id === init.id);
+          // If nvidia is present, ensure defaultModel is nvidia/nemotron-3.5-lightning-30b-a3b if updated
+          if (init.id === "p-nvidia") {
+            return {
+              ...init,
+              ...(found || {}),
+              defaultModel: found?.defaultModel || init.defaultModel,
+              apiKey: found?.apiKey || init.apiKey,
+              apiKeyMasked: found?.apiKeyMasked || init.apiKeyMasked,
+            };
+          }
           return found || init;
         });
 

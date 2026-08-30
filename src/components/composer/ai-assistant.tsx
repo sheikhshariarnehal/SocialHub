@@ -15,12 +15,14 @@ import {
   Settings2,
   ExternalLink,
   Gift,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   useMountedAIProviders,
   type AIProviderItem,
+  NVIDIA_POPULAR_MODELS,
   OPENROUTER_FREE_MODELS,
 } from "@/hooks/use-ai-providers";
 
@@ -32,12 +34,18 @@ const TONES = [
   "Inspiring & Story-driven",
 ];
 
-const TOP_FREE_QUICK_MODELS = [
+const TOP_NVIDIA_QUICK_MODELS = [
+  { id: "nvidia/nemotron-3.5-lightning-30b-a3b", name: "Nemotron 3.5 Lightning (Default)" },
+  { id: "moonshotai/kimi-k3", name: "Moonshot Kimi K3" },
+  { id: "meta/llama-3.3-70b-instruct", name: "Meta Llama 3.3 70B" },
+  { id: "deepseek-ai/deepseek-r1", name: "DeepSeek R1 (NVIDIA)" },
+];
+
+const TOP_OPENROUTER_QUICK_MODELS = [
   { id: "z-ai/glm-5.2:free", name: "Z.ai GLM 5.2 (Free)" },
   { id: "minimax/minimax-m3:free", name: "MiniMax M3 (Free, 1M)" },
   { id: "nvidia/nemotron-3.5-lightning:free", name: "Nemotron 3.5 (Free, 1M)" },
   { id: "google/gemma-4-31b-it:free", name: "Google Gemma 4 31B (Free)" },
-  { id: "inclusionai/ling-3.0-flash-fin:free", name: "Ling 3.0 Flash Fin (Free)" },
   { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
 ];
 
@@ -58,18 +66,20 @@ export function AiAssistant({
   const [showProviderMenu, setShowProviderMenu] = useState(false);
 
   const isBYO = activeProvider.providerType !== "free_default";
+  const isNvidia = activeProvider.providerType === "nvidia";
   const isOpenRouter = activeProvider.providerType === "openrouter";
 
-  const handleSelectOpenRouterModel = (modelId: string, modelName: string) => {
-    if (activeProvider.id === "p-openrouter" && activeProvider.apiKey) {
+  const handleSelectModel = (providerId: string, modelId: string, modelName: string) => {
+    const targetProvider = providers.find((p) => p.id === providerId);
+    if (targetProvider && targetProvider.apiKey) {
       saveProvider({
-        id: "p-openrouter",
-        apiKey: activeProvider.apiKey,
+        id: providerId,
+        apiKey: targetProvider.apiKey,
         model: modelId,
-        latency: activeProvider.latency,
+        latency: targetProvider.latency,
       });
       setShowProviderMenu(false);
-      toast.success(`Switched OpenRouter model to ${modelName}`);
+      toast.success(`Switched model to ${modelName}`);
     }
   };
 
@@ -79,7 +89,7 @@ export function AiAssistant({
     // If using free tier and quota is exhausted
     if (!isBYO && freeQuotaRemaining <= 0) {
       toast.error(
-        "Free AI quota exhausted. Configure your OpenRouter or OpenAI key in Settings for unlimited generations!"
+        "Free AI quota exhausted. Configure your NVIDIA or OpenRouter key in Settings for unlimited generations!"
       );
       return;
     }
@@ -148,13 +158,15 @@ export function AiAssistant({
             type="button"
             onClick={() => setShowProviderMenu(!showProviderMenu)}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-              isBYO
+              isNvidia
+                ? "bg-[#76B900]/15 border-[#76B900]/30 text-[#76B900] hover:bg-[#76B900]/25"
+                : isBYO
                 ? "bg-purple-500/15 border-purple-500/30 text-purple-300 hover:bg-purple-500/25"
                 : "bg-primary/10 border-primary/25 text-primary hover:bg-primary/20"
             }`}
           >
             <Cpu className="h-3 w-3" />
-            <span className="max-w-[140px] truncate">
+            <span className="max-w-[150px] truncate">
               {activeProvider.name}: {activeProvider.defaultModel?.split("/").pop() || "Default"}
             </span>
             <ChevronDown className="h-3 w-3 opacity-70" />
@@ -193,8 +205,13 @@ export function AiAssistant({
                       <div className="truncate pr-1">
                         <div className="font-semibold text-[11px] flex items-center gap-1">
                           {p.name}
+                          {p.id === "p-nvidia" && (
+                            <span className="text-[8px] bg-[#76B900]/20 text-[#76B900] px-1 rounded font-bold">
+                              NVIDIA
+                            </span>
+                          )}
                           {p.defaultModel?.includes(":free") && (
-                            <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-1 rounded">
+                            <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold">
                               FREE
                             </span>
                           )}
@@ -209,6 +226,35 @@ export function AiAssistant({
                 })}
               </div>
 
+              {/* If NVIDIA NIM is Active, Show Quick Models Switcher */}
+              {isNvidia && activeProvider.status === "active" && (
+                <div className="mt-2 pt-2 border-t border-border/60">
+                  <div className="px-2 py-1 text-[10px] font-semibold text-[#76B900] uppercase tracking-wider flex items-center gap-1">
+                    <Zap className="h-3 w-3" /> Quick Switch NVIDIA NIM Model
+                  </div>
+                  <div className="space-y-0.5">
+                    {TOP_NVIDIA_QUICK_MODELS.map((m) => {
+                      const isSelected = activeProvider.defaultModel === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handleSelectModel("p-nvidia", m.id, m.name)}
+                          className={`w-full flex items-center justify-between px-2 py-1 rounded text-left text-[11px] transition-colors ${
+                            isSelected
+                              ? "bg-[#76B900]/20 text-[#76B900] font-semibold"
+                              : "hover:bg-accent/60 text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <span className="truncate">{m.name}</span>
+                          {isSelected && <Check className="h-3 w-3 text-[#76B900] shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* If OpenRouter is Active, Show Quick Free Models Switcher */}
               {isOpenRouter && activeProvider.status === "active" && (
                 <div className="mt-2 pt-2 border-t border-border/60">
@@ -216,13 +262,13 @@ export function AiAssistant({
                     <Gift className="h-3 w-3" /> Quick Switch OpenRouter Model
                   </div>
                   <div className="space-y-0.5">
-                    {TOP_FREE_QUICK_MODELS.map((m) => {
+                    {TOP_OPENROUTER_QUICK_MODELS.map((m) => {
                       const isSelected = activeProvider.defaultModel === m.id;
                       return (
                         <button
                           key={m.id}
                           type="button"
-                          onClick={() => handleSelectOpenRouterModel(m.id, m.name)}
+                          onClick={() => handleSelectModel("p-openrouter", m.id, m.name)}
                           className={`w-full flex items-center justify-between px-2 py-1 rounded text-left text-[11px] transition-colors ${
                             isSelected
                               ? "bg-emerald-500/20 text-emerald-300 font-semibold"
@@ -246,7 +292,7 @@ export function AiAssistant({
                 >
                   <span className="flex items-center gap-1.5">
                     <Settings2 className="h-3.5 w-3.5" />
-                    Browse 20+ Free OpenRouter Models
+                    Configure Providers & Models
                   </span>
                   <ExternalLink className="h-3 w-3 opacity-70" />
                 </Link>
@@ -288,7 +334,7 @@ export function AiAssistant({
         <div className="relative">
           <input
             type="text"
-            placeholder="e.g. Bangladesh economic growth, SaaS startup tips, product launch..."
+            placeholder="e.g. GPU computing wonders, SaaS startup tips, product launch..."
             value={topicPrompt}
             onChange={(e) => setTopicPrompt(e.target.value)}
             className="w-full rounded-xl border border-input bg-card/80 px-3 py-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"

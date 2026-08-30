@@ -25,6 +25,9 @@ export function cleanSocialPostOutput(rawText: string): string {
   if (!rawText) return "";
   let text = rawText.trim();
 
+  // Strip <think>...</think> reasoning/thinking tags if model returned reasoning
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
   // Remove markdown headers like ### Hook or # Title
   text = text.replace(/^#+\s+/gm, "");
 
@@ -37,7 +40,7 @@ export function cleanSocialPostOutput(rawText: string): string {
   text = text.replace(/\*\*(.*?)\*\*/g, "$1");
   text = text.replace(/\*(.*?)\*/g, "$1");
 
-  return text;
+  return text.trim();
 }
 
 function buildSystemPrompt(action: string, tone: string): string {
@@ -71,16 +74,16 @@ Requirements:
 }
 
 /**
- * NVIDIA NIM API caller (e.g. moonshotai/kimi-k3, meta/llama-3.3-70b-instruct)
+ * NVIDIA NIM API caller (e.g. nvidia/nemotron-3.5-lightning-30b-a3b, moonshotai/kimi-k3)
  */
 async function callNvidia(
   apiKey: string,
-  model: string = "moonshotai/kimi-k3",
+  model: string = "nvidia/nemotron-3.5-lightning-30b-a3b",
   systemPrompt: string,
   userPrompt: string
 ): Promise<{ text: string; tokensUsed: number }> {
   const endpoint = "https://integrate.api.nvidia.com/v1/chat/completions";
-  const selectedModel = model?.trim() || "moonshotai/kimi-k3";
+  const selectedModel = model?.trim() || "nvidia/nemotron-3.5-lightning-30b-a3b";
 
   const res = await fetch(endpoint, {
     method: "POST",
@@ -354,14 +357,15 @@ export async function generateContent(
   const systemPrompt = buildSystemPrompt(action, tone);
   const userPrompt = prompt?.trim() || "Social media insights and best practices";
 
-  // 1. NVIDIA NIM (e.g. moonshotai/kimi-k3)
+  // 1. NVIDIA NIM (nvidia/nemotron-3.5-lightning-30b-a3b, moonshotai/kimi-k3, etc.)
   if (provider === "nvidia" && apiKey) {
     try {
-      const result = await callNvidia(apiKey, model, systemPrompt, userPrompt);
+      const selectedModel = model || "nvidia/nemotron-3.5-lightning-30b-a3b";
+      const result = await callNvidia(apiKey, selectedModel, systemPrompt, userPrompt);
       return {
         text: result.text,
         providerUsed: "NVIDIA NIM",
-        modelUsed: model || "moonshotai/kimi-k3",
+        modelUsed: selectedModel,
         tokensUsed: result.tokensUsed,
       };
     } catch (err: unknown) {
@@ -440,14 +444,14 @@ export async function generateContent(
     try {
       const result = await callNvidia(
         serverNvidiaKey,
-        "moonshotai/kimi-k3",
+        "nvidia/nemotron-3.5-lightning-30b-a3b",
         systemPrompt,
         userPrompt
       );
       return {
         text: result.text,
         providerUsed: "SocialHub AI Core (NVIDIA NIM)",
-        modelUsed: "moonshotai/kimi-k3",
+        modelUsed: "nvidia/nemotron-3.5-lightning-30b-a3b",
         tokensUsed: result.tokensUsed,
       };
     } catch (err) {

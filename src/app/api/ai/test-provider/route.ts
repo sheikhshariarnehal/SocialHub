@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
 
-    // 1. NVIDIA NIM (Moonshot Kimi K3, Llama 3.3 70B, Nemotron 4 340B, etc.)
+    // 1. NVIDIA NIM (nvidia/nemotron-3.5-lightning-30b-a3b, moonshotai/kimi-k3, etc.)
     if (providerType === "nvidia") {
-      const selectedModel = model?.trim() || "moonshotai/kimi-k3";
+      const selectedModel = model?.trim() || "nvidia/nemotron-3.5-lightning-30b-a3b";
       const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: "POST",
         headers: {
