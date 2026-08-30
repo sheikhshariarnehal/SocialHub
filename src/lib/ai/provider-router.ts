@@ -28,7 +28,7 @@ export function cleanSocialPostOutput(rawText: string): string {
   // Strip <think>...</think> reasoning/thinking tags if model returned reasoning
   text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
-  // Remove markdown headers like ### Hook or # Title
+  // Remove markdown headers like ### Hook or # Title or ### Option 1
   text = text.replace(/^#+\s+/gm, "");
 
   // Strip enclosing quotes if model returned "..."
@@ -84,11 +84,15 @@ async function callNvidia(
 ): Promise<{ text: string; tokensUsed: number }> {
   const endpoint = "https://integrate.api.nvidia.com/v1/chat/completions";
   const selectedModel = model?.trim() || "nvidia/nemotron-3.5-lightning-30b-a3b";
+  const activeKey =
+    apiKey?.trim() ||
+    process.env.NVIDIA_API_KEY ||
+    "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";
 
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${apiKey.trim()}`,
+      "Authorization": `Bearer ${activeKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -98,7 +102,10 @@ async function callNvidia(
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 4096,
+      max_tokens: 1024,
+      chat_template_kwargs: {
+        enable_thinking: false,
+      },
     }),
   });
 
@@ -358,10 +365,14 @@ export async function generateContent(
   const userPrompt = prompt?.trim() || "Social media insights and best practices";
 
   // 1. NVIDIA NIM (nvidia/nemotron-3.5-lightning-30b-a3b, moonshotai/kimi-k3, etc.)
-  if (provider === "nvidia" && apiKey) {
+  if (provider === "nvidia") {
     try {
       const selectedModel = model || "nvidia/nemotron-3.5-lightning-30b-a3b";
-      const result = await callNvidia(apiKey, selectedModel, systemPrompt, userPrompt);
+      const keyToUse =
+        apiKey ||
+        process.env.NVIDIA_API_KEY ||
+        "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";
+      const result = await callNvidia(keyToUse, selectedModel, systemPrompt, userPrompt);
       return {
         text: result.text,
         providerUsed: "NVIDIA NIM",

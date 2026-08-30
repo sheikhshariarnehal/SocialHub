@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
           model: selectedModel,
           messages: [{ role: "user", content: "Ping" }],
           max_tokens: 5,
+          chat_template_kwargs: {
+            enable_thinking: false,
+          },
         }),
       });
 
