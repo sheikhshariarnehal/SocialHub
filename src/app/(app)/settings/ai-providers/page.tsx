@@ -20,6 +20,9 @@ import {
   Search,
   RefreshCw,
   Gift,
+  AlertTriangle,
+  Radio,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,6 +68,14 @@ export default function AiProvidersSettingsPage() {
   const [isTesting, setIsTesting] = useState(false);
   const [showCustomModelInput, setShowCustomModelInput] = useState(false);
 
+  // 2-Step Test & Verification State
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [testResult, setTestResult] = useState<{
+    latency?: string;
+    message?: string;
+    error?: string;
+  } | null>(null);
+
   // Model Selection Filter & Search State
   const [modelTab, setModelTab] = useState<"free" | "popular" | "all">("free");
   const [modelSearchQuery, setModelSearchQuery] = useState("");
@@ -79,7 +90,21 @@ export default function AiProvidersSettingsPage() {
     setShowCustomModelInput(false);
     setModelTab(p.id === "p-openrouter" ? "free" : "popular");
     setModelSearchQuery("");
+    setTestStatus(p.status === "active" && p.apiKey ? "success" : "idle");
+    setTestResult(p.latency ? { latency: p.latency, message: `Previously verified with latency ${p.latency}` } : null);
     setModalOpen(true);
+  };
+
+  const handleKeyChange = (val: string) => {
+    setInputKey(val);
+    setTestStatus("idle");
+    setTestResult(null);
+  };
+
+  const handleModelChange = (modelId: string) => {
+    setSelectedModel(modelId);
+    setTestStatus("idle");
+    setTestResult(null);
   };
 
   const fetchLiveOpenRouterModels = async () => {
@@ -113,11 +138,12 @@ export default function AiProvidersSettingsPage() {
     }
   };
 
-  const handleSaveConfig = async () => {
+  // Step 1: Run Live Connection Test
+  const handleTestConnection = async () => {
     if (!selectedProvider) return;
 
     if (selectedProvider.providerType !== "free_default" && !inputKey.trim()) {
-      toast.error("Please enter a valid API secret key.");
+      toast.error("Please enter your API secret key first.");
       return;
     }
 
@@ -127,6 +153,8 @@ export default function AiProvidersSettingsPage() {
     }
 
     setIsTesting(true);
+    setTestStatus("testing");
+    setTestResult(null);
 
     try {
       const res = await fetch("/api/ai/test-provider", {
@@ -143,31 +171,47 @@ export default function AiProvidersSettingsPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        toast.error(
-          data.error || `Failed to verify credentials for ${selectedProvider.name}`
-        );
+        const errorMsg =
+          data.error || `Failed to verify credentials for ${selectedProvider.name}`;
+        setTestStatus("error");
+        setTestResult({ error: errorMsg });
+        toast.error(errorMsg);
         return;
       }
 
-      saveProvider({
-        id: selectedProvider.id,
-        apiKey: inputKey.trim(),
-        model: selectedModel.trim(),
-        baseUrl: inputBaseUrl.trim() || undefined,
+      setTestStatus("success");
+      setTestResult({
         latency: data.latency || "180ms",
+        message: data.message || `Successfully connected to ${selectedModel || selectedProvider.name}!`,
       });
-
-      setModalOpen(false);
-      toast.success(
-        `Connection to ${selectedProvider.name} verified & active! (${data.latency || "OK"})`
-      );
+      toast.success(`Connection verified! Response time: ${data.latency || "OK"}`);
     } catch (err: unknown) {
-      toast.error(
-        err instanceof Error ? err.message : "Network error testing provider"
-      );
+      const errorMsg =
+        err instanceof Error ? err.message : "Network error testing provider";
+      setTestStatus("error");
+      setTestResult({ error: errorMsg });
+      toast.error(errorMsg);
     } finally {
       setIsTesting(false);
     }
+  };
+
+  // Step 2: Save & Activate Provider
+  const handleSaveVerifiedConfig = () => {
+    if (!selectedProvider) return;
+
+    saveProvider({
+      id: selectedProvider.id,
+      apiKey: inputKey.trim(),
+      model: selectedModel.trim(),
+      baseUrl: inputBaseUrl.trim() || undefined,
+      latency: testResult?.latency || "180ms",
+    });
+
+    setModalOpen(false);
+    toast.success(
+      `${selectedProvider.name} (${selectedModel}) saved and activated!`
+    );
   };
 
   const handleSetDefault = (providerId: string) => {
@@ -405,7 +449,7 @@ export default function AiProvidersSettingsPage() {
         </div>
       </div>
 
-      {/* Provider Config Modal */}
+      {/* Provider Config Modal with 2-Step Test & Save Flow */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
@@ -467,7 +511,7 @@ export default function AiProvidersSettingsPage() {
                       : "AIzaSy..."
                   }
                   value={inputKey}
-                  onChange={(e) => setInputKey(e.target.value)}
+                  onChange={(e) => handleKeyChange(e.target.value)}
                   leftIcon={<Key className="h-4 w-4" />}
                   autoFocus
                 />
@@ -550,7 +594,7 @@ export default function AiProvidersSettingsPage() {
                 </div>
 
                 {/* Models List */}
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 border border-border/40 rounded-xl p-1.5 bg-card/20">
+                <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1 border border-border/40 rounded-xl p-1.5 bg-card/20">
                   {displayedModels.length === 0 ? (
                     <div className="p-4 text-center text-xs text-muted-foreground">
                       No models found matching &quot;{modelSearchQuery}&quot;. You can type a custom model ID below.
@@ -563,7 +607,7 @@ export default function AiProvidersSettingsPage() {
                           key={preset.id}
                           type="button"
                           onClick={() => {
-                            setSelectedModel(preset.id);
+                            handleModelChange(preset.id);
                             setShowCustomModelInput(false);
                           }}
                           className={`w-full flex items-center justify-between p-2 rounded-lg border text-left text-xs transition-all ${
@@ -636,7 +680,7 @@ export default function AiProvidersSettingsPage() {
                   <Input
                     id="modelInput"
                     value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
+                    onChange={(e) => handleModelChange(e.target.value)}
                     placeholder="e.g. z-ai/glm-5.2:free or inclusionai/ling-3.0-flash-fin:free"
                     className="font-mono text-xs mt-1"
                   />
@@ -651,20 +695,79 @@ export default function AiProvidersSettingsPage() {
                 <Input
                   id="baseUrlInput"
                   value={inputBaseUrl}
-                  onChange={(e) => setInputBaseUrl(e.target.value)}
+                  onChange={(e) => {
+                    setInputBaseUrl(e.target.value);
+                    setTestStatus("idle");
+                  }}
                   placeholder="https://api.together.xyz/v1"
                 />
               </div>
             )}
+
+            {/* Verification Result Callout */}
+            {testStatus === "success" && (
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 flex items-start gap-3 text-xs animate-in fade-in-50">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-emerald-400">
+                    Connection Verified & Ready to Save!
+                  </div>
+                  <div className="text-[11px] text-emerald-300/90 mt-0.5 font-mono">
+                    Model: <strong>{selectedModel}</strong> • Latency: <strong>{testResult?.latency}</strong>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    Click <strong>&quot;Save & Activate Provider&quot;</strong> below to save this model.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {testStatus === "error" && (
+              <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 flex items-start gap-3 text-xs animate-in fade-in-50">
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-destructive">Connection Failed</div>
+                  <div className="text-[11px] text-destructive/90 mt-0.5">
+                    {testResult?.error || "Could not authenticate with provider."}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    Please check your API key and model ID, then click &quot;Test Connection&quot; again.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          <DialogFooter className="border-t border-border/40 pt-3">
+          {/* 2-Step Footer: Step 1 = Test Connection, Step 2 = Save & Activate (shown when verified) */}
+          <DialogFooter className="border-t border-border/40 pt-3 flex items-center justify-between gap-2 sm:justify-between">
             <Button variant="outline" onClick={() => setModalOpen(false)}>
               Cancel
             </Button>
-            <Button variant="brand" isLoading={isTesting} onClick={handleSaveConfig}>
-              Test & Save Model
-            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant={testStatus === "success" ? "outline" : "brand"}
+                isLoading={isTesting}
+                onClick={handleTestConnection}
+                className="text-xs"
+              >
+                <Zap className="h-3.5 w-3.5 mr-1" />
+                {testStatus === "success" ? "Test Again" : "Test Connection"}
+              </Button>
+
+              {testStatus === "success" && (
+                <Button
+                  type="button"
+                  variant="brand"
+                  onClick={handleSaveVerifiedConfig}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs animate-in fade-in-50"
+                >
+                  <Check className="h-3.5 w-3.5 mr-1" />
+                  Save & Activate Provider
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
