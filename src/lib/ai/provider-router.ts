@@ -1,6 +1,6 @@
 /**
  * AI Provider Hub — Router & Abstraction Layer
- * Supports Free Default, OpenAI, Google Gemini, OpenRouter, and Custom OpenAI-compatible endpoints.
+ * Supports Free Default, NVIDIA NIM, OpenAI, Google Gemini, OpenRouter, and Custom endpoints.
  */
 
 export interface GenerateOptions {
@@ -9,7 +9,7 @@ export interface GenerateOptions {
   tone?: string;
   context?: string;
   apiKey?: string;
-  provider?: "free_default" | "openai" | "gemini" | "openrouter" | "custom";
+  provider?: "free_default" | "openai" | "gemini" | "openrouter" | "nvidia" | "custom";
   model?: string;
   baseUrl?: string;
 }
@@ -68,6 +68,51 @@ Requirements:
 4. Add 3 to 5 relevant hashtags at the bottom.
 5. ${formattingRules}`;
   }
+}
+
+/**
+ * NVIDIA NIM API caller (e.g. moonshotai/kimi-k3, meta/llama-3.3-70b-instruct)
+ */
+async function callNvidia(
+  apiKey: string,
+  model: string = "moonshotai/kimi-k3",
+  systemPrompt: string,
+  userPrompt: string
+): Promise<{ text: string; tokensUsed: number }> {
+  const endpoint = "https://integrate.api.nvidia.com/v1/chat/completions";
+  const selectedModel = model?.trim() || "moonshotai/kimi-k3";
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey.trim()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: selectedModel,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 4096,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const errorMsg =
+      errorData?.error?.message ||
+      errorData?.message ||
+      `NVIDIA NIM API error (${res.status}): ${res.statusText}`;
+    throw new Error(errorMsg);
+  }
+
+  const data = await res.json();
+  const rawText = data.choices?.[0]?.message?.content?.trim() || "";
+  const text = cleanSocialPostOutput(rawText);
+  const tokensUsed = data.usage?.total_tokens || 180;
+  return { text, tokensUsed };
 }
 
 /**
@@ -268,7 +313,6 @@ function generateContextualFallback(action: string, prompt: string, tone: string
       .replace(/[^a-zA-Z0-9 ]/g, "")
       .split(" ")
       .filter((w) => w.length > 2)
-      .slice(0, 4)
       .map((w) => `#${w.charAt(0).toUpperCase() + w.slice(1)}`);
     const defaultTags = ["#Growth", "#Strategy", "#Leadership", "#Innovation", "#Productivity", "#Trends2026"];
     const combinedTags = Array.from(new Set([...keywords, ...defaultTags])).join(" ");
@@ -310,7 +354,23 @@ export async function generateContent(
   const systemPrompt = buildSystemPrompt(action, tone);
   const userPrompt = prompt?.trim() || "Social media insights and best practices";
 
-  // 1. OpenRouter
+  // 1. NVIDIA NIM (e.g. moonshotai/kimi-k3)
+  if (provider === "nvidia" && apiKey) {
+    try {
+      const result = await callNvidia(apiKey, model, systemPrompt, userPrompt);
+      return {
+        text: result.text,
+        providerUsed: "NVIDIA NIM",
+        modelUsed: model || "moonshotai/kimi-k3",
+        tokensUsed: result.tokensUsed,
+      };
+    } catch (err: unknown) {
+      console.error("NVIDIA generation error:", err);
+      throw err;
+    }
+  }
+
+  // 2. OpenRouter
   if (provider === "openrouter" && apiKey) {
     try {
       const result = await callOpenRouter(apiKey, model, systemPrompt, userPrompt);
@@ -326,7 +386,7 @@ export async function generateContent(
     }
   }
 
-  // 2. OpenAI
+  // 3. OpenAI
   if (provider === "openai" && apiKey) {
     try {
       const result = await callOpenAI(apiKey, model, systemPrompt, userPrompt);
@@ -342,7 +402,7 @@ export async function generateContent(
     }
   }
 
-  // 3. Google Gemini
+  // 4. Google Gemini
   if (provider === "gemini" && apiKey) {
     try {
       const result = await callGemini(apiKey, model, systemPrompt, userPrompt);
@@ -358,7 +418,7 @@ export async function generateContent(
     }
   }
 
-  // 4. Custom Endpoint
+  // 5. Custom Endpoint
   if (provider === "custom" && baseUrl) {
     try {
       const result = await callCustom(apiKey, baseUrl, model, systemPrompt, userPrompt);
@@ -374,7 +434,27 @@ export async function generateContent(
     }
   }
 
-  // 5. Check if server-side environment variables exist for free tier proxy
+  // 6. Server-side environment key fallbacks
+  const serverNvidiaKey = process.env.NVIDIA_API_KEY;
+  if (serverNvidiaKey) {
+    try {
+      const result = await callNvidia(
+        serverNvidiaKey,
+        "moonshotai/kimi-k3",
+        systemPrompt,
+        userPrompt
+      );
+      return {
+        text: result.text,
+        providerUsed: "SocialHub AI Core (NVIDIA NIM)",
+        modelUsed: "moonshotai/kimi-k3",
+        tokensUsed: result.tokensUsed,
+      };
+    } catch (err) {
+      console.warn("Server NVIDIA fallback failed:", err);
+    }
+  }
+
   const serverOpenRouterKey = process.env.OPENROUTER_API_KEY;
   if (serverOpenRouterKey) {
     try {
@@ -415,7 +495,7 @@ export async function generateContent(
     }
   }
 
-  // 6. Built-in Procedural Fallback
+  // 7. Built-in Procedural Fallback
   const generated = generateContextualFallback(action, userPrompt, tone);
   return {
     text: cleanSocialPostOutput(generated),

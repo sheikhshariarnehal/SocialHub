@@ -46,6 +46,7 @@ export type AIProviderType =
   | "openai"
   | "gemini"
   | "openrouter"
+  | "nvidia"
   | "custom";
 
 export type ReplyMode = "review" | "auto";

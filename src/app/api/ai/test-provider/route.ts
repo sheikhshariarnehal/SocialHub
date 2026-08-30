@@ -21,7 +21,41 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
 
-    // 1. OpenRouter
+    // 1. NVIDIA NIM (Moonshot Kimi K3, Llama 3.3 70B, Nemotron 4 340B, etc.)
+    if (providerType === "nvidia") {
+      const selectedModel = model?.trim() || "moonshotai/kimi-k3";
+      const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey.trim()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [{ role: "user", content: "Ping" }],
+          max_tokens: 5,
+        }),
+      });
+
+      const latency = `${Date.now() - startTime}ms`;
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const message =
+          errorData?.error?.message ||
+          errorData?.message ||
+          `NVIDIA NIM returned status ${res.status}: ${res.statusText}`;
+        return NextResponse.json({ success: false, error: message }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        latency,
+        message: `Successfully connected to NVIDIA NIM (${selectedModel})!`,
+      });
+    }
+
+    // 2. OpenRouter
     if (providerType === "openrouter") {
       const selectedModel = model?.trim() || "anthropic/claude-3.5-sonnet";
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -57,7 +91,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2. OpenAI
+    // 3. OpenAI
     if (providerType === "openai") {
       const selectedModel = model?.trim() || "gpt-4o-mini";
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -91,7 +125,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 3. Google Gemini
+    // 4. Google Gemini
     if (providerType === "gemini") {
       const selectedModel = model?.trim() || "gemini-1.5-flash";
       const res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
@@ -125,7 +159,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. Custom Endpoint
+    // 5. Custom Endpoint
     if (providerType === "custom") {
       if (!baseUrl) {
         return NextResponse.json(

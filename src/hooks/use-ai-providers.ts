@@ -8,7 +8,7 @@ export interface AIProviderItem {
   id: string;
   name: string;
   type: "Built-in" | "BYO Key";
-  providerType: "free_default" | "openai" | "gemini" | "openrouter" | "custom";
+  providerType: "free_default" | "openai" | "gemini" | "openrouter" | "nvidia" | "custom";
   defaultModel: string;
   status: "active" | "unconfigured" | "error";
   isDefault: boolean;
@@ -27,6 +27,15 @@ export interface ModelPreset {
   context?: string;
   speed?: string;
 }
+
+export const NVIDIA_POPULAR_MODELS: ModelPreset[] = [
+  { id: "moonshotai/kimi-k3", name: "Moonshot: Kimi K3", badge: "Default", desc: "Flagship multimodal & deep reasoning model on NVIDIA NIM", context: "16k", speed: "High" },
+  { id: "meta/llama-3.3-70b-instruct", name: "Meta: Llama 3.3 70B", badge: "Fast", desc: "Fast open instruction-tuned model", context: "128k", speed: "Ultra Fast" },
+  { id: "nvidia/nemotron-4-340b-instruct", name: "NVIDIA: Nemotron 4 340B", badge: "Flagship", desc: "NVIDIA's massive 340B enterprise model", context: "4k" },
+  { id: "deepseek-ai/deepseek-r1", name: "DeepSeek: R1 (NVIDIA NIM)", badge: "Reasoning", desc: "Deep reasoning hosted on NVIDIA infrastructure" },
+  { id: "mistralai/mixtral-8x22b-instruct-v0.1", name: "Mistral: Mixtral 8x22B", badge: "MoE", desc: "High-throughput Mixture-of-Experts architecture" },
+  { id: "microsoft/phi-3.5-vision-instruct", name: "Microsoft: Phi-3.5 Vision", badge: "Vision", desc: "Multimodal image & vision comprehension model" },
+];
 
 export const OPENROUTER_FREE_MODELS: ModelPreset[] = [
   { id: "z-ai/glm-5.2:free", name: "Z.ai: GLM 5.2", badge: "100% Free", desc: "Ultra-fast generation, 256k context", isFree: true, context: "256k", speed: "188 t/s" },
@@ -79,15 +88,17 @@ export const GEMINI_POPULAR_MODELS: ModelPreset[] = [
 
 export const INITIAL_AI_PROVIDERS: AIProviderItem[] = [
   {
-    id: "p-free",
-    name: "SocialHub Free Tier",
-    type: "Built-in",
-    providerType: "free_default",
-    defaultModel: "SocialHub AI Core v1",
+    id: "p-nvidia",
+    name: "NVIDIA NIM / Moonshot",
+    type: "BYO Key",
+    providerType: "nvidia",
+    defaultModel: "moonshotai/kimi-k3",
     status: "active",
     isDefault: true,
-    apiKeyMasked: "Included with Free plan",
-    latency: "240ms",
+    apiKey: "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",
+    apiKeyMasked: "nvap...VCSz",
+    latency: "165ms",
+    baseUrl: "https://integrate.api.nvidia.com/v1",
   },
   {
     id: "p-openrouter",
@@ -118,6 +129,17 @@ export const INITIAL_AI_PROVIDERS: AIProviderItem[] = [
     status: "unconfigured",
     isDefault: false,
     apiKeyMasked: "Not configured",
+  },
+  {
+    id: "p-free",
+    name: "SocialHub Free Tier",
+    type: "Built-in",
+    providerType: "free_default",
+    defaultModel: "SocialHub AI Core v1",
+    status: "active",
+    isDefault: false,
+    apiKeyMasked: "Included with Free plan",
+    latency: "240ms",
   },
 ];
 
@@ -161,18 +183,13 @@ export const useAIProvidersStore = create<AIProvidersState>()(
             return p;
           });
 
-          // If the user just configured this provider and no other BYO key is default, make it default
-          const defaultExists = updated.some((p) => p.isDefault && p.id !== "p-free");
-          if (!defaultExists) {
-            return {
-              providers: updated.map((p) => ({
-                ...p,
-                isDefault: p.id === id,
-              })),
-            };
-          }
-
-          return { providers: updated };
+          // Ensure this provider is marked default
+          return {
+            providers: updated.map((p) => ({
+              ...p,
+              isDefault: p.id === id,
+            })),
+          };
         });
       },
 
@@ -203,13 +220,17 @@ export const useAIProvidersStore = create<AIProvidersState>()(
             return p;
           });
 
-          // Ensure at least free tier is default if default was removed
+          // Ensure at least another active provider or free tier is default
           const hasDefault = updated.some((p) => p.isDefault);
           if (!hasDefault) {
+            const fallbackDefault =
+              updated.find((p) => p.status === "active") ||
+              updated.find((p) => p.id === "p-free") ||
+              updated[0];
             return {
               providers: updated.map((p) => ({
                 ...p,
-                isDefault: p.id === "p-free",
+                isDefault: p.id === fallbackDefault.id,
               })),
             };
           }
@@ -220,9 +241,15 @@ export const useAIProvidersStore = create<AIProvidersState>()(
 
       getActiveProvider: () => {
         const state = get();
+        // 1. Default active provider
         const defaultProvider = state.providers.find((p) => p.isDefault && p.status === "active");
         if (defaultProvider) return defaultProvider;
 
+        // 2. NVIDIA NIM if active
+        const nvidia = state.providers.find((p) => p.id === "p-nvidia" && p.status === "active");
+        if (nvidia) return nvidia;
+
+        // 3. Any active BYO key
         const anyActive = state.providers.find((p) => p.status === "active" && p.id !== "p-free");
         if (anyActive) return anyActive;
 
@@ -233,6 +260,29 @@ export const useAIProvidersStore = create<AIProvidersState>()(
     }),
     {
       name: "socialhub-ai-providers-storage",
+      merge: (persistedState: any, currentState) => {
+        if (!persistedState || !persistedState.providers) {
+          return currentState;
+        }
+
+        // Merge any new providers (like p-nvidia) into existing stored state
+        const storedProviders: AIProviderItem[] = persistedState.providers;
+        const mergedProviders = currentState.providers.map((init) => {
+          const found = storedProviders.find((sp) => sp.id === init.id);
+          return found || init;
+        });
+
+        // Ensure at least one default
+        if (!mergedProviders.some((p) => p.isDefault)) {
+          mergedProviders[0].isDefault = true;
+        }
+
+        return {
+          ...currentState,
+          ...persistedState,
+          providers: mergedProviders,
+        };
+      },
     }
   )
 );

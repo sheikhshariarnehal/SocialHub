@@ -48,6 +48,7 @@ import {
   useMountedAIProviders,
   type AIProviderItem,
   type ModelPreset,
+  NVIDIA_POPULAR_MODELS,
   OPENROUTER_FREE_MODELS,
   OPENROUTER_POPULAR_MODELS,
   OPENAI_POPULAR_MODELS,
@@ -210,7 +211,7 @@ export default function AiProvidersSettingsPage() {
 
     setModalOpen(false);
     toast.success(
-      `${selectedProvider.name} (${selectedModel}) saved and activated!`
+      `${selectedProvider.name} (${selectedModel}) saved and activated as default!`
     );
   };
 
@@ -230,7 +231,9 @@ export default function AiProvidersSettingsPage() {
 
     let list: ModelPreset[] = [];
 
-    if (selectedProvider.providerType === "openrouter") {
+    if (selectedProvider.providerType === "nvidia") {
+      list = NVIDIA_POPULAR_MODELS;
+    } else if (selectedProvider.providerType === "openrouter") {
       if (liveModels.length > 0) {
         list =
           modelTab === "free"
@@ -275,7 +278,7 @@ export default function AiProvidersSettingsPage() {
             AI Provider Hub
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure BYO AI models (OpenRouter with 20+ Free Models, OpenAI, Gemini) or use our free built-in quota.
+            Configure BYO AI models (NVIDIA NIM, OpenRouter, OpenAI, Gemini) or use our free built-in quota.
           </p>
         </div>
       </div>
@@ -288,11 +291,11 @@ export default function AiProvidersSettingsPage() {
               <div className="flex items-center gap-2">
                 <Gift className="h-5 w-5 text-emerald-400" />
                 <h3 className="text-base font-bold text-foreground">
-                  Free OpenRouter Models & Unlimited BYO Key
+                  NVIDIA NIM & BYO Model Routing Active
                 </h3>
               </div>
               <p className="text-xs text-muted-foreground">
-                Connect OpenRouter to access free models like <strong>Z.ai GLM 5.2 (Free)</strong>, <strong>MiniMax M3 (Free)</strong>, <strong>Nemotron 3.5 Lightning (Free)</strong>, and <strong>Gemma 4 (Free)</strong> at $0 cost with zero monthly limits!
+                BYO API keys like <strong>NVIDIA NIM (Moonshot Kimi K3)</strong> and <strong>OpenRouter Free Models</strong> run directly with zero markup and unlimited generations.
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -333,7 +336,9 @@ export default function AiProvidersSettingsPage() {
                   <div className="flex items-center gap-2.5">
                     <div
                       className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs ${
-                        p.id === "p-openrouter"
+                        p.id === "p-nvidia"
+                          ? "bg-[#76B900]/15 text-[#76B900] border border-[#76B900]/30"
+                          : p.id === "p-openrouter"
                           ? "bg-purple-500/15 text-purple-400 border border-purple-500/20"
                           : p.id === "p-openai"
                           ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
@@ -347,6 +352,11 @@ export default function AiProvidersSettingsPage() {
                     <div>
                       <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
                         {p.name}
+                        {p.id === "p-nvidia" && (
+                          <Badge variant="brand" className="text-[9px] py-0 px-1.5 bg-[#76B900]/20 text-[#76B900] border-[#76B900]/30">
+                            NVIDIA NIM
+                          </Badge>
+                        )}
                         {p.id === "p-openrouter" && (
                           <Badge variant="brand" className="text-[9px] py-0 px-1.5 bg-purple-500/20 text-purple-300 border-purple-500/30">
                             20+ Free Models
@@ -445,7 +455,7 @@ export default function AiProvidersSettingsPage() {
         <ShieldCheck className="h-5 w-5 text-success shrink-0 mt-0.5" />
         <div>
           <span className="font-semibold text-foreground">Zero markup on BYO API keys:</span>{" "}
-          SocialHub connects directly to OpenRouter, OpenAI, and Gemini. API tokens are stored in your secure workspace storage and never exposed to 3rd parties.
+          SocialHub connects directly to NVIDIA NIM, OpenRouter, OpenAI, and Gemini. API tokens are stored in your secure workspace storage and never exposed to 3rd parties.
         </div>
       </div>
 
@@ -457,7 +467,9 @@ export default function AiProvidersSettingsPage() {
               Configure {selectedProvider?.name}
             </DialogTitle>
             <DialogDescription>
-              {selectedProvider?.id === "p-openrouter"
+              {selectedProvider?.id === "p-nvidia"
+                ? "Connect NVIDIA NIM to run Moonshot Kimi K3, Llama 3.3 70B, and DeepSeek R1 with ultra-low latency."
+                : selectedProvider?.id === "p-openrouter"
                 ? "Select from 20+ Free OpenRouter models ($0 cost) or flagship models (Claude 3.5, GPT-4o, DeepSeek)."
                 : `Enter your ${selectedProvider?.name} credentials to enable direct model routing.`}
             </DialogDescription>
@@ -469,6 +481,16 @@ export default function AiProvidersSettingsPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="apiKeyInput">API Secret Key</Label>
+                  {selectedProvider?.id === "p-nvidia" && (
+                    <a
+                      href="https://build.nvidia.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-[#76B900] hover:underline flex items-center gap-1 font-medium"
+                    >
+                      Get NVIDIA NGC key <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
                   {selectedProvider?.id === "p-openrouter" && (
                     <a
                       href="https://openrouter.ai/keys"
@@ -504,7 +526,9 @@ export default function AiProvidersSettingsPage() {
                   id="apiKeyInput"
                   type="password"
                   placeholder={
-                    selectedProvider?.id === "p-openrouter"
+                    selectedProvider?.id === "p-nvidia"
+                      ? "nvapi-..."
+                      : selectedProvider?.id === "p-openrouter"
                       ? "sk-or-v1-..."
                       : selectedProvider?.id === "p-openai"
                       ? "sk-proj-..."
@@ -585,7 +609,7 @@ export default function AiProvidersSettingsPage() {
                 {/* Model Search Box */}
                 <div className="relative">
                   <Input
-                    placeholder="Search models by name, ID (e.g. glm, nemotron, gemma, claude, deepseek)..."
+                    placeholder="Search models by name or ID (e.g. kimi, nemotron, llama, claude)..."
                     value={modelSearchQuery}
                     onChange={(e) => setModelSearchQuery(e.target.value)}
                     leftIcon={<Search className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -681,7 +705,7 @@ export default function AiProvidersSettingsPage() {
                     id="modelInput"
                     value={selectedModel}
                     onChange={(e) => handleModelChange(e.target.value)}
-                    placeholder="e.g. z-ai/glm-5.2:free or inclusionai/ling-3.0-flash-fin:free"
+                    placeholder="e.g. moonshotai/kimi-k3 or meta/llama-3.3-70b-instruct"
                     className="font-mono text-xs mt-1"
                   />
                 )}
@@ -699,7 +723,7 @@ export default function AiProvidersSettingsPage() {
                     setInputBaseUrl(e.target.value);
                     setTestStatus("idle");
                   }}
-                  placeholder="https://api.together.xyz/v1"
+                  placeholder="https://integrate.api.nvidia.com/v1"
                 />
               </div>
             )}
