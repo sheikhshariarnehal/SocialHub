@@ -39,7 +39,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  useAIProvidersStore,
+  useMountedAIProviders,
   type AIProviderItem,
   OPENROUTER_POPULAR_MODELS,
   OPENAI_POPULAR_MODELS,
@@ -48,7 +48,7 @@ import {
 
 export default function AiProvidersSettingsPage() {
   const { providers, saveProvider, setDefaultProvider, disconnectProvider } =
-    useAIProvidersStore();
+    useMountedAIProviders();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<AIProviderItem | null>(

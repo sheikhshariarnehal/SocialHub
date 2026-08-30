@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Send, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useAIProvidersStore } from "@/hooks/use-ai-providers";
+import { useMountedAIProviders } from "@/hooks/use-ai-providers";
 
 export function ReplyComposer({
   parentAuthor,
@@ -18,8 +18,7 @@ export function ReplyComposer({
   onSend: (replyText: string) => Promise<void>;
   onCancel: () => void;
 }) {
-  const { getActiveProvider } = useAIProvidersStore();
-  const activeProvider = getActiveProvider();
+  const { activeProvider } = useMountedAIProviders();
 
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -200,3 +201,27 @@ export const useAIProvidersStore = create<AIProvidersState>()(
     }
   )
 );
+
+/**
+ * Hydration-safe hook for accessing AI Providers across client components
+ */
+export function useMountedAIProviders() {
+  const store = useAIProvidersStore();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const activeProvider = isMounted
+    ? store.getActiveProvider()
+    : INITIAL_AI_PROVIDERS[0];
+  const providers = isMounted ? store.providers : INITIAL_AI_PROVIDERS;
+
+  return {
+    ...store,
+    isMounted,
+    activeProvider,
+    providers,
+  };
+}

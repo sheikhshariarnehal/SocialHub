@@ -21,26 +21,52 @@ export interface GenerateResult {
   tokensUsed: number;
 }
 
+export function cleanSocialPostOutput(rawText: string): string {
+  if (!rawText) return "";
+  let text = rawText.trim();
+
+  // Remove markdown headers like ### Hook or # Title
+  text = text.replace(/^#+\s+/gm, "");
+
+  // Strip enclosing quotes if model returned "..."
+  if (text.startsWith('"') && text.endsWith('"') && text.length > 20) {
+    text = text.slice(1, -1).trim();
+  }
+
+  // Clean markdown asterisks: **Bold** -> Bold
+  text = text.replace(/\*\*(.*?)\*\*/g, "$1");
+  text = text.replace(/\*(.*?)\*/g, "$1");
+
+  return text;
+}
+
 function buildSystemPrompt(action: string, tone: string): string {
+  const formattingRules = `
+CRITICAL SOCIAL MEDIA FORMATTING RULES:
+- DO NOT use markdown bold syntax with asterisks (like **Heading** or *italic*). Social media platforms (LinkedIn, X/Twitter, Facebook, Instagram) do not support markdown and will display ugly raw asterisks.
+- Format using clean line breaks, spaced paragraphs, and emojis for bullet points (e.g. 🔹, 💡, ⚡️, 👉, •).
+- For emphasis or section headers, use clean capitalization (e.g. "QUESTION EVERYTHING — The best innovations begin with skepticism") rather than wrapping in asterisks.
+- Output ONLY the ready-to-publish social caption without any introductory greetings or commentary.`;
+
   switch (action) {
     case "hashtags":
-      return "You are an expert social media strategist and SEO specialist. Analyze the provided post and generate 8 to 15 highly relevant, trending, and niche hashtags. Return the original post with the new hashtags neatly appended at the bottom. Output only the final post with hashtags.";
+      return `You are an expert social media strategist and SEO specialist. Analyze the provided post and generate 8 to 15 highly relevant, trending, and niche hashtags. Return the original post with the new hashtags neatly appended at the bottom. Do NOT use markdown asterisks. Output only the final post with hashtags.`;
     case "rewrite":
-      return `You are an expert copywriter and brand voice strategist. Rewrite the provided social media post strictly matching the "${tone}" tone. Improve clarity, impact, engagement hooks, and pacing while preserving the core message. Do not add conversational commentary. Output only the rewritten post content.`;
+      return `You are an expert copywriter and brand voice strategist. Rewrite the provided social media post strictly matching the "${tone}" tone. Improve clarity, impact, engagement hooks, and pacing while preserving the core message. ${formattingRules}`;
     case "shorten":
-      return "You are an elite copywriter specializing in high-impact micro-content (X / Twitter). Condense the provided content into a punchy, engaging tweet under 280 characters with a strong hook and 1-2 hashtags. Output only the condensed post.";
+      return `You are an elite copywriter specializing in high-impact micro-content (X / Twitter). Condense the provided content into a punchy, engaging tweet under 280 characters with a strong hook and 1-2 hashtags. Do NOT use markdown asterisks. Output only the condensed post.`;
     case "reply":
-      return `You are a social media community manager. Write an authentic, warm, helpful, and engaging reply to the user's comment or message in a "${tone}" tone. Keep it concise (1 to 3 sentences). Output only the reply text.`;
+      return `You are a social media community manager. Write an authentic, warm, helpful, and engaging reply to the user's comment or message in a "${tone}" tone. Keep it concise (1 to 3 sentences). Do NOT use markdown asterisks. Output only the reply text.`;
     case "create":
     default:
       return `You are a world-class social media strategist and ghostwriter for top founders and creators. 
 Create an engaging, viral-ready social media post tailored in a "${tone}" tone.
 Requirements:
 1. Start with an irresistible 1-line hook that grabs attention.
-2. Structure the body with clear, readable spacing, bullet points, or numbered takeaways for maximum readability.
+2. Structure the body with clear, readable spacing, bullet points (🔹, ⚡️, or •), or numbered takeaways for maximum readability.
 3. Include an engaging Call To Action (CTA) at the end to drive comments and discussions.
 4. Add 3 to 5 relevant hashtags at the bottom.
-5. Do NOT include any meta-introductions (like "Here is your post:") or explanations. Output only the ready-to-publish post.`;
+5. ${formattingRules}`;
   }
 }
 
@@ -85,7 +111,8 @@ async function callOpenRouter(
   }
 
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content?.trim() || "";
+  const rawText = data.choices?.[0]?.message?.content?.trim() || "";
+  const text = cleanSocialPostOutput(rawText);
   const tokensUsed = data.usage?.total_tokens || 180;
   return { text, tokensUsed };
 }
@@ -129,7 +156,8 @@ async function callOpenAI(
   }
 
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content?.trim() || "";
+  const rawText = data.choices?.[0]?.message?.content?.trim() || "";
+  const text = cleanSocialPostOutput(rawText);
   const tokensUsed = data.usage?.total_tokens || 180;
   return { text, tokensUsed };
 }
@@ -173,7 +201,8 @@ async function callGemini(
   }
 
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content?.trim() || "";
+  const rawText = data.choices?.[0]?.message?.content?.trim() || "";
+  const text = cleanSocialPostOutput(rawText);
   const tokensUsed = data.usage?.total_tokens || 180;
   return { text, tokensUsed };
 }
@@ -221,7 +250,8 @@ async function callCustom(
   }
 
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content?.trim() || "";
+  const rawText = data.choices?.[0]?.message?.content?.trim() || "";
+  const text = cleanSocialPostOutput(rawText);
   const tokensUsed = data.usage?.total_tokens || 150;
   return { text, tokensUsed };
 }
@@ -258,7 +288,7 @@ function generateContextualFallback(action: string, prompt: string, tone: string
   }
 
   // Action === 'create'
-  return `💡 Let's talk about ${cleanPrompt}.\n\nMost teams overlook this, but here are 3 game-changing realities to keep in mind:\n\n1️⃣ **The Landscape Has Shifted** — What worked two years ago is now table stakes. Agility and speed to execution matter more than ever.\n\n2️⃣ **Data-Driven Consistency** — High performers don't rely on guesswork. They build systems that compound over time.\n\n3️⃣ **Direct Engagement Wins** — Authentic relationships and clear value propositions always outperform generic noise.\n\n👇 How is your team approaching this in 2026? Drop your thoughts below — let's start the discussion!\n\n#${cleanPrompt.split(" ")[0]?.replace(/[^a-zA-Z0-9]/g, "") || "Business"} #Innovation #GrowthStrategy #Leadership #Insights`;
+  return `💡 Let's talk about ${cleanPrompt}.\n\nMost teams overlook this, but here are 3 game-changing realities to keep in mind:\n\n1️⃣ The Landscape Has Shifted — What worked two years ago is now table stakes. Agility and speed to execution matter more than ever.\n\n2️⃣ Data-Driven Consistency — High performers don't rely on guesswork. They build systems that compound over time.\n\n3️⃣ Direct Engagement Wins — Authentic relationships and clear value propositions always outperform generic noise.\n\n👇 How is your team approaching this in 2026? Drop your thoughts below — let's start the discussion!\n\n#${cleanPrompt.split(" ")[0]?.replace(/[^a-zA-Z0-9]/g, "") || "Business"} #Innovation #GrowthStrategy #Leadership #Insights`;
 }
 
 /**
@@ -388,7 +418,7 @@ export async function generateContent(
   // 6. Built-in Procedural Fallback
   const generated = generateContextualFallback(action, userPrompt, tone);
   return {
-    text: generated,
+    text: cleanSocialPostOutput(generated),
     providerUsed: "SocialHub AI Core v1",
     modelUsed: "built-in",
     tokensUsed: 140,

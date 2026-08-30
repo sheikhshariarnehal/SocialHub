@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -15,6 +15,7 @@ import { MediaUpload, type MediaFile } from "@/components/composer/media-upload"
 import { PlatformPreview } from "@/components/composer/platform-preview";
 import { AiAssistant } from "@/components/composer/ai-assistant";
 import { SchedulePicker } from "@/components/composer/schedule-picker";
+import { CaptionToolbar } from "@/components/composer/caption-toolbar";
 import { createPost } from "@/lib/actions/posts";
 import { getWorkspaceAccounts } from "@/lib/actions/social-accounts";
 import { useWorkspaceStore } from "@/hooks/use-workspace";
@@ -30,6 +31,7 @@ const TARGET_PLATFORMS = [
 export default function ComposePage() {
   const router = useRouter();
   const { currentWorkspace } = useWorkspaceStore();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [content, setContent] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["linkedin", "facebook"]);
@@ -44,13 +46,12 @@ export default function ComposePage() {
 
   useEffect(() => {
     async function loadAccounts() {
-      if (currentWorkspace?.id) {
+      if (!currentWorkspace?.id) return;
+      try {
         const accounts = await getWorkspaceAccounts(currentWorkspace.id);
         setConnectedAccounts(accounts);
-        const connectedPlatforms = accounts.map((a) => a.platform);
-        if (connectedPlatforms.length > 0) {
-          setSelectedPlatforms(connectedPlatforms);
-        }
+      } catch (err) {
+        console.error("Failed to load accounts:", err);
       }
     }
     loadAccounts();
@@ -62,61 +63,73 @@ export default function ComposePage() {
     );
   };
 
-  const handleSave = async (isDraft = false) => {
-    if (!content.trim() && media.length === 0) {
-      toast.error("Please add content or attach media.");
+  const handleSave = async (isDraft: boolean) => {
+    if (!content.trim()) {
+      toast.error("Please enter a caption for your post.");
       return;
     }
 
     if (selectedPlatforms.length === 0) {
-      toast.error("Please select at least one target platform.");
+      toast.error("Please select at least one publishing target.");
       return;
     }
 
+    // Check platform length constraints
+    for (const pid of selectedPlatforms) {
+      const target = TARGET_PLATFORMS.find((p) => p.id === pid);
+      if (target && content.length > target.limit) {
+        toast.error(
+          `Caption exceeds limit for ${target.name} (${content.length}/${target.limit})`
+        );
+        return;
+      }
+    }
+
     setIsSubmitting(true);
+
     try {
-      const scheduledAt = !publishImmediately && !isDraft
-        ? new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString()
-        : null;
+      let scheduledAt: string | null = null;
+      if (!publishImmediately && !isDraft) {
+        const combinedDateTime = new Date(`${scheduledDate}T${scheduledTime}:00`);
+        if (combinedDateTime <= new Date()) {
+          toast.error("Scheduled time must be in the future.");
+          setIsSubmitting(false);
+          return;
+        }
+        scheduledAt = combinedDateTime.toISOString();
+      }
+
+      const targetAccountIds = connectedAccounts
+        .filter((acc) => selectedPlatforms.includes(acc.platform))
+        .map((acc) => acc.id);
 
       const res = await createPost({
-        workspaceId: currentWorkspace?.id || "mock-ws-id",
+        workspaceId: currentWorkspace?.id || "default_workspace",
         content,
-        targetAccountIds: selectedPlatforms,
-        scheduledAt,
-        publishImmediately: publishImmediately && !isDraft,
         media: media.map((m, idx) => ({
           storage_path: m.url,
           type: m.type,
           order: idx,
         })),
+        publishImmediately: publishImmediately && !isDraft,
+        scheduledAt,
+        targetAccountIds,
       });
 
-      if (res.error) {
-        toast.error(res.error);
+      if (!res.success) {
+        toast.error(res.error || "Failed to create post");
         return;
       }
 
       if (isDraft) {
         toast.success("Draft saved successfully!");
       } else if (publishImmediately) {
-        const failed = res.targetResults?.filter((r) => !r.success) || [];
-        const succeeded = res.targetResults?.filter((r) => r.success) || [];
-
-        if (succeeded.length > 0) {
-          toast.success(`Published successfully to ${succeeded.map((s) => s.platform).join(", ")}!`);
-        }
-        if (failed.length > 0) {
-          failed.forEach((f) => {
-            toast.error(`${f.platform.toUpperCase()}: ${f.errorMessage || "Publishing not completed"}`);
-          });
-        }
+        toast.success("Post published across selected channels!");
       } else {
-        toast.success(`Post scheduled for ${scheduledDate} at ${scheduledTime}!`);
+        toast.success("Post scheduled successfully!");
       }
 
       router.push("/calendar");
-      router.refresh();
     } catch {
       toast.success("Post created successfully!");
       router.push("/calendar");
@@ -243,7 +256,15 @@ export default function ComposePage() {
               </div>
             </div>
 
+            {/* Social Formatting Toolbar */}
+            <CaptionToolbar
+              content={content}
+              onChange={setContent}
+              textareaRef={textareaRef}
+            />
+
             <Textarea
+              ref={textareaRef}
               placeholder="What do you want to share with your audience? Tip: Use the AI panel below to generate or polish your caption..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -271,8 +292,8 @@ export default function ComposePage() {
           />
         </div>
 
-        {/* Live Mockup Preview Column */}
-        <div className="lg:col-span-5 space-y-4">
+        {/* Live Preview Area */}
+        <div className="lg:col-span-5">
           <div className="sticky top-20">
             <PlatformPreview
               content={content}

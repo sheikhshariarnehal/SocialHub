@@ -18,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  useAIProvidersStore,
+  useMountedAIProviders,
   type AIProviderItem,
 } from "@/hooks/use-ai-providers";
 
@@ -37,10 +37,9 @@ export function AiAssistant({
   currentContent: string;
   onApplyContent: (newContent: string) => void;
 }) {
-  const { providers, getActiveProvider, setDefaultProvider } =
-    useAIProvidersStore();
+  const { providers, activeProvider, setDefaultProvider, isMounted } =
+    useMountedAIProviders();
 
-  const activeProvider = getActiveProvider();
   const [topicPrompt, setTopicPrompt] = useState("");
   const [selectedTone, setSelectedTone] = useState(TONES[0]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -198,7 +197,12 @@ export function AiAssistant({
 
       {/* Quota / Status Badge */}
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>Active Model: <strong className="text-foreground font-mono">{activeProvider.defaultModel}</strong></span>
+        <span>
+          Active Model:{" "}
+          <strong className="text-foreground font-mono">
+            {activeProvider.defaultModel}
+          </strong>
+        </span>
         {isBYO ? (
           <Badge variant="success" dot className="text-[10px] py-0 px-2">
             Unlimited BYO Key

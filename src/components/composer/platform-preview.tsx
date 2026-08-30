@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FormattedPostContent } from "./formatted-post-content";
 import type { MediaFile } from "./media-upload";
 
 export function PlatformPreview({
@@ -36,9 +37,6 @@ export function PlatformPreview({
       setActiveTab(selectedPlatforms[0]);
     }
   }, [selectedPlatforms, activeTab]);
-
-  const displayContent =
-    content || "Your post caption will appear here in real-time...";
 
   const renderMediaContent = (aspectClass = "aspect-video") => {
     if (media.length === 0) return null;
@@ -144,9 +142,11 @@ export function PlatformPreview({
             <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
           </div>
 
-          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
-            {displayContent}
-          </p>
+          <FormattedPostContent
+            content={content}
+            platform="linkedin"
+            className="text-xs"
+          />
 
           {renderMediaContent("aspect-video")}
 
@@ -189,9 +189,11 @@ export function PlatformPreview({
             <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
           </div>
 
-          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">
-            {displayContent}
-          </p>
+          <FormattedPostContent
+            content={content}
+            platform="facebook"
+            className="text-xs"
+          />
 
           {renderMediaContent("aspect-video")}
 
@@ -276,9 +278,11 @@ export function PlatformPreview({
             {/* Caption */}
             <div className="text-xs leading-relaxed">
               <span className="font-bold mr-1.5 text-foreground">nimon_solutions</span>
-              <span className="text-muted-foreground whitespace-pre-wrap">
-                {displayContent}
-              </span>
+              <FormattedPostContent
+                content={content}
+                platform="instagram"
+                className="inline text-muted-foreground"
+              />
             </div>
 
             <p className="text-[10px] text-muted-foreground/60 uppercase">
@@ -306,9 +310,12 @@ export function PlatformPreview({
                   @socialhub · 1m
                 </span>
               </div>
-              <p className="text-xs leading-relaxed text-foreground mt-1 whitespace-pre-wrap">
-                {displayContent}
-              </p>
+
+              <FormattedPostContent
+                content={content}
+                platform="twitter"
+                className="text-xs mt-1"
+              />
 
               {renderMediaContent("aspect-video mt-3")}
 
