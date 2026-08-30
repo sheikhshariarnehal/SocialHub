@@ -14,12 +14,14 @@ import {
   Cpu,
   Settings2,
   ExternalLink,
+  Gift,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   useMountedAIProviders,
   type AIProviderItem,
+  OPENROUTER_FREE_MODELS,
 } from "@/hooks/use-ai-providers";
 
 const TONES = [
@@ -30,6 +32,15 @@ const TONES = [
   "Inspiring & Story-driven",
 ];
 
+const TOP_FREE_QUICK_MODELS = [
+  { id: "z-ai/glm-5.2:free", name: "Z.ai GLM 5.2 (Free)" },
+  { id: "minimax/minimax-m3:free", name: "MiniMax M3 (Free, 1M)" },
+  { id: "nvidia/nemotron-3.5-lightning:free", name: "Nemotron 3.5 (Free, 1M)" },
+  { id: "google/gemma-4-31b-it:free", name: "Google Gemma 4 31B (Free)" },
+  { id: "inclusionai/ling-3.0-flash-fin:free", name: "Ling 3.0 Flash Fin (Free)" },
+  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
+];
+
 export function AiAssistant({
   currentContent,
   onApplyContent,
@@ -37,7 +48,7 @@ export function AiAssistant({
   currentContent: string;
   onApplyContent: (newContent: string) => void;
 }) {
-  const { providers, activeProvider, setDefaultProvider, isMounted } =
+  const { providers, activeProvider, setDefaultProvider, saveProvider, isMounted } =
     useMountedAIProviders();
 
   const [topicPrompt, setTopicPrompt] = useState("");
@@ -47,6 +58,20 @@ export function AiAssistant({
   const [showProviderMenu, setShowProviderMenu] = useState(false);
 
   const isBYO = activeProvider.providerType !== "free_default";
+  const isOpenRouter = activeProvider.providerType === "openrouter";
+
+  const handleSelectOpenRouterModel = (modelId: string, modelName: string) => {
+    if (activeProvider.id === "p-openrouter" && activeProvider.apiKey) {
+      saveProvider({
+        id: "p-openrouter",
+        apiKey: activeProvider.apiKey,
+        model: modelId,
+        latency: activeProvider.latency,
+      });
+      setShowProviderMenu(false);
+      toast.success(`Switched OpenRouter model to ${modelName}`);
+    }
+  };
 
   const handleGenerate = async (
     action: "create" | "hashtags" | "rewrite" | "shorten"
@@ -92,7 +117,7 @@ export function AiAssistant({
           setFreeQuotaRemaining((prev) => Math.max(0, prev - 1));
         }
 
-        const modelLabel = data.modelUsed ? ` (${data.modelUsed})` : "";
+        const modelLabel = data.modelUsed ? ` (${data.modelUsed.split("/").pop()})` : "";
         toast.success(`Generated via ${data.providerUsed}${modelLabel}!`);
       }
     } catch (err: unknown) {
@@ -129,7 +154,7 @@ export function AiAssistant({
             }`}
           >
             <Cpu className="h-3 w-3" />
-            <span className="max-w-[130px] truncate">
+            <span className="max-w-[140px] truncate">
               {activeProvider.name}: {activeProvider.defaultModel?.split("/").pop() || "Default"}
             </span>
             <ChevronDown className="h-3 w-3 opacity-70" />
@@ -137,9 +162,9 @@ export function AiAssistant({
 
           {/* Dropdown Menu */}
           {showProviderMenu && (
-            <div className="absolute right-0 top-full mt-1 w-64 rounded-xl border border-border/80 bg-card/95 p-1.5 shadow-xl backdrop-blur-md z-50 animate-in fade-in-50">
+            <div className="absolute right-0 top-full mt-1 w-72 rounded-xl border border-border/80 bg-card/95 p-2 shadow-2xl backdrop-blur-md z-50 animate-in fade-in-50">
               <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Select Active Model
+                Select Active Provider
               </div>
 
               <div className="space-y-1">
@@ -157,7 +182,7 @@ export function AiAssistant({
                         setShowProviderMenu(false);
                         toast.success(`Switched active AI model to ${p.name}`);
                       }}
-                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors ${
                         isCurrent
                           ? "bg-primary/15 text-primary font-medium"
                           : isActive
@@ -166,7 +191,14 @@ export function AiAssistant({
                       }`}
                     >
                       <div className="truncate pr-1">
-                        <div className="font-semibold text-[11px]">{p.name}</div>
+                        <div className="font-semibold text-[11px] flex items-center gap-1">
+                          {p.name}
+                          {p.defaultModel?.includes(":free") && (
+                            <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-1 rounded">
+                              FREE
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] text-muted-foreground truncate font-mono">
                           {isActive ? p.defaultModel : "Not configured"}
                         </div>
@@ -177,7 +209,36 @@ export function AiAssistant({
                 })}
               </div>
 
-              <div className="border-t border-border/60 mt-1.5 pt-1.5">
+              {/* If OpenRouter is Active, Show Quick Free Models Switcher */}
+              {isOpenRouter && activeProvider.status === "active" && (
+                <div className="mt-2 pt-2 border-t border-border/60">
+                  <div className="px-2 py-1 text-[10px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                    <Gift className="h-3 w-3" /> Quick Switch OpenRouter Model
+                  </div>
+                  <div className="space-y-0.5">
+                    {TOP_FREE_QUICK_MODELS.map((m) => {
+                      const isSelected = activeProvider.defaultModel === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handleSelectOpenRouterModel(m.id, m.name)}
+                          className={`w-full flex items-center justify-between px-2 py-1 rounded text-left text-[11px] transition-colors ${
+                            isSelected
+                              ? "bg-emerald-500/20 text-emerald-300 font-semibold"
+                              : "hover:bg-accent/60 text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <span className="truncate">{m.name}</span>
+                          {isSelected && <Check className="h-3 w-3 text-emerald-400 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t border-border/60 mt-2 pt-1.5">
                 <Link
                   href="/settings/ai-providers"
                   onClick={() => setShowProviderMenu(false)}
@@ -185,7 +246,7 @@ export function AiAssistant({
                 >
                   <span className="flex items-center gap-1.5">
                     <Settings2 className="h-3.5 w-3.5" />
-                    Configure Providers
+                    Browse 20+ Free OpenRouter Models
                   </span>
                   <ExternalLink className="h-3 w-3 opacity-70" />
                 </Link>
@@ -197,11 +258,16 @@ export function AiAssistant({
 
       {/* Quota / Status Badge */}
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>
-          Active Model:{" "}
-          <strong className="text-foreground font-mono">
+        <span className="flex items-center gap-1">
+          Model:{" "}
+          <strong className="text-foreground font-mono truncate max-w-[200px]">
             {activeProvider.defaultModel}
           </strong>
+          {activeProvider.defaultModel?.includes(":free") && (
+            <span className="text-[9px] font-bold bg-emerald-500/20 text-emerald-400 px-1 py-0.2 rounded">
+              100% FREE
+            </span>
+          )}
         </span>
         {isBYO ? (
           <Badge variant="success" dot className="text-[10px] py-0 px-2">
