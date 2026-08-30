@@ -1,35 +1,28 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import {
-  Sparkles,
   Key,
   CheckCircle2,
   AlertCircle,
-  Plus,
   Sliders,
   Zap,
-  ArrowRight,
   ShieldCheck,
   Cpu,
   Trash2,
   ExternalLink,
   Check,
-  ChevronDown,
   Search,
   RefreshCw,
   Gift,
-  AlertTriangle,
   Radio,
-  CheckCircle,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -69,7 +62,7 @@ export default function AiProvidersSettingsPage() {
   const [isTesting, setIsTesting] = useState(false);
   const [showCustomModelInput, setShowCustomModelInput] = useState(false);
 
-  // 2-Step Test & Verification State
+  // Verification State
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [testResult, setTestResult] = useState<{
     latency?: string;
@@ -77,7 +70,7 @@ export default function AiProvidersSettingsPage() {
     error?: string;
   } | null>(null);
 
-  // Model Selection Filter & Search State
+  // Model Selection Filter & Search
   const [modelTab, setModelTab] = useState<"free" | "popular" | "all">("free");
   const [modelSearchQuery, setModelSearchQuery] = useState("");
   const [liveModels, setLiveModels] = useState<ModelPreset[]>([]);
@@ -92,7 +85,11 @@ export default function AiProvidersSettingsPage() {
     setModelTab(p.id === "p-openrouter" ? "free" : "popular");
     setModelSearchQuery("");
     setTestStatus(p.status === "active" && p.apiKey ? "success" : "idle");
-    setTestResult(p.latency ? { latency: p.latency, message: `Previously verified with latency ${p.latency}` } : null);
+    setTestResult(
+      p.latency
+        ? { latency: p.latency, message: `Active with latency ${p.latency}` }
+        : null
+    );
     setModalOpen(true);
   };
 
@@ -123,10 +120,10 @@ export default function AiProvidersSettingsPage() {
           return {
             id: m.id,
             name: m.name,
-            badge: isFree ? "100% Free" : "Standard",
+            badge: isFree ? "Free" : "Standard",
             desc: m.description || `Context: ${m.context_length?.toLocaleString() || "N/A"} tokens`,
             isFree,
-            context: m.context_length ? `${(m.context_length / 1000).toFixed(0)}k` : undefined,
+            context: m.context_length ? `${Math.round(m.context_length / 1000)}k` : undefined,
           };
         });
         setLiveModels(mapped);
@@ -139,12 +136,12 @@ export default function AiProvidersSettingsPage() {
     }
   };
 
-  // Step 1: Run Live Connection Test
+  // Step 1: Run Connection Test
   const handleTestConnection = async () => {
     if (!selectedProvider) return;
 
     if (selectedProvider.providerType !== "free_default" && !inputKey.trim()) {
-      toast.error("Please enter your API secret key first.");
+      toast.error("Please enter your API key first.");
       return;
     }
 
@@ -182,10 +179,10 @@ export default function AiProvidersSettingsPage() {
 
       setTestStatus("success");
       setTestResult({
-        latency: data.latency || "180ms",
-        message: data.message || `Successfully connected to ${selectedModel || selectedProvider.name}!`,
+        latency: data.latency || "160ms",
+        message: `Connected successfully (${data.latency})`,
       });
-      toast.success(`Connection verified! Response time: ${data.latency || "OK"}`);
+      toast.success(`Verified connection in ${data.latency || "160ms"}`);
     } catch (err: unknown) {
       const errorMsg =
         err instanceof Error ? err.message : "Network error testing provider";
@@ -197,7 +194,7 @@ export default function AiProvidersSettingsPage() {
     }
   };
 
-  // Step 2: Save & Activate Provider
+  // Step 2: Save Verified Config
   const handleSaveVerifiedConfig = () => {
     if (!selectedProvider) return;
 
@@ -206,18 +203,18 @@ export default function AiProvidersSettingsPage() {
       apiKey: inputKey.trim(),
       model: selectedModel.trim(),
       baseUrl: inputBaseUrl.trim() || undefined,
-      latency: testResult?.latency || "180ms",
+      latency: testResult?.latency || "160ms",
     });
 
     setModalOpen(false);
     toast.success(
-      `${selectedProvider.name} (${selectedModel}) saved and activated as default!`
+      `${selectedProvider.name} (${selectedModel}) saved and active`
     );
   };
 
   const handleSetDefault = (providerId: string) => {
     setDefaultProvider(providerId);
-    toast.success("Default AI provider updated!");
+    toast.success("Default provider updated");
   };
 
   const handleDisconnect = (p: AIProviderItem) => {
@@ -261,8 +258,8 @@ export default function AiProvidersSettingsPage() {
         (m) =>
           m.name.toLowerCase().includes(q) ||
           m.id.toLowerCase().includes(q) ||
-          m.desc.toLowerCase().includes(q) ||
-          (m.badge && m.badge.toLowerCase().includes(q))
+          (m.badge && m.badge.toLowerCase().includes(q)) ||
+          (m.speed && m.speed.toLowerCase().includes(q))
       );
     }
 
@@ -270,52 +267,45 @@ export default function AiProvidersSettingsPage() {
   }, [selectedProvider, modelTab, modelSearchQuery, liveModels]);
 
   return (
-    <div className="space-y-6 animate-in fade-in-50">
+    <div className="space-y-6 max-w-5xl">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">
-            AI Provider Hub
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Configure BYO AI models (NVIDIA NIM, OpenRouter, OpenAI, Gemini) or use our free built-in quota.
-          </p>
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-foreground">
+          AI Providers
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Connect NVIDIA NIM, OpenRouter, OpenAI, or Gemini for direct model execution with zero markup.
+        </p>
+      </div>
+
+      {/* Overview Card */}
+      <div className="rounded-xl border border-border/70 bg-card/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Zap className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-foreground">
+              Direct BYO Model Routing Active
+            </div>
+            <div className="text-xs text-muted-foreground">
+              API requests run directly against your connected models with custom rate limits.
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 self-end sm:self-auto">
+          <div className="text-right">
+            <span className="text-sm font-semibold text-foreground">12</span>
+            <span className="text-xs text-muted-foreground"> / 20 free tier used</span>
+          </div>
+          <div className="h-2 w-20 bg-muted rounded-full overflow-hidden">
+            <div className="h-full bg-primary rounded-full" style={{ width: "60%" }} />
+          </div>
         </div>
       </div>
 
-      {/* Quota Overview Card */}
-      <Card glass className="border-primary/20 bg-gradient-to-br from-card/80 to-primary/5">
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Gift className="h-5 w-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-foreground">
-                  NVIDIA NIM & BYO Model Routing Active
-                </h3>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                BYO API keys like <strong>NVIDIA NIM (Moonshot Kimi K3)</strong> and <strong>OpenRouter Free Models</strong> run directly with zero markup and unlimited generations.
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <span className="text-2xl font-extrabold text-foreground">12</span>
-                <span className="text-sm text-muted-foreground"> / 20 built-in used</span>
-              </div>
-              <div className="h-10 w-24 bg-muted/60 rounded-full overflow-hidden p-1 border border-border">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500"
-                  style={{ width: "60%" }}
-                />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Provider Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {providers.map((p) => {
           const isActive = p.status === "active";
           const isBYO = p.type === "BYO Key";
@@ -324,27 +314,26 @@ export default function AiProvidersSettingsPage() {
           return (
             <Card
               key={p.id}
-              glass
-              className={`transition-all duration-200 ${
+              className={`transition-all ${
                 p.isDefault
-                  ? "border-primary/60 shadow-md ring-1 ring-primary/20"
-                  : "border-border/80"
+                  ? "border-primary/50 ring-1 ring-primary/20 bg-card/90"
+                  : "border-border/70 bg-card/50"
               }`}
             >
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div
-                      className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs ${
+                      className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs ${
                         p.id === "p-nvidia"
-                          ? "bg-[#76B900]/15 text-[#76B900] border border-[#76B900]/30"
+                          ? "bg-[#76B900]/15 text-[#76B900]"
                           : p.id === "p-openrouter"
-                          ? "bg-purple-500/15 text-purple-400 border border-purple-500/20"
+                          ? "bg-purple-500/15 text-purple-400"
                           : p.id === "p-openai"
-                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                          ? "bg-emerald-500/15 text-emerald-400"
                           : p.id === "p-gemini"
-                          ? "bg-blue-500/15 text-blue-400 border border-blue-500/20"
-                          : "bg-primary/15 text-primary border border-primary/20"
+                          ? "bg-blue-500/15 text-blue-400"
+                          : "bg-primary/15 text-primary"
                       }`}
                     >
                       <Cpu className="h-4 w-4" />
@@ -352,32 +341,27 @@ export default function AiProvidersSettingsPage() {
                     <div>
                       <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
                         {p.name}
-                        {p.id === "p-nvidia" && (
-                          <Badge variant="brand" className="text-[9px] py-0 px-1.5 bg-[#76B900]/20 text-[#76B900] border-[#76B900]/30">
-                            NVIDIA NIM
-                          </Badge>
-                        )}
                         {p.id === "p-openrouter" && (
-                          <Badge variant="brand" className="text-[9px] py-0 px-1.5 bg-purple-500/20 text-purple-300 border-purple-500/30">
-                            20+ Free Models
-                          </Badge>
+                          <span className="text-[10px] font-normal text-purple-400">
+                            (Free Models)
+                          </span>
                         )}
                       </CardTitle>
-                      <p className="text-[10px] text-muted-foreground">{p.type}</p>
+                      <p className="text-[11px] text-muted-foreground">{p.type}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {p.isDefault && (
-                      <Badge variant="brand" className="text-[10px]">
+                      <Badge variant="brand" className="text-[10px] py-0 px-1.5">
                         Default
                       </Badge>
                     )}
                     {isActive ? (
-                      <Badge variant="success" dot className="text-[10px]">
+                      <Badge variant="success" dot className="text-[10px] py-0 px-1.5">
                         Active
                       </Badge>
                     ) : (
-                      <Badge variant="secondary" className="text-[10px]">
+                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
                         Not Set
                       </Badge>
                     )}
@@ -385,32 +369,32 @@ export default function AiProvidersSettingsPage() {
                 </div>
               </CardHeader>
 
-              <CardContent className="space-y-3">
-                <div className="rounded-lg border border-border/50 bg-card/40 p-2.5 space-y-1.5 text-xs">
+              <CardContent className="space-y-3 pt-1">
+                <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 space-y-1 text-xs">
                   <div className="flex justify-between items-center text-muted-foreground text-[11px]">
-                    <span>Selected Model:</span>
-                    <span className="font-mono text-foreground font-medium truncate max-w-[200px] flex items-center gap-1" title={p.defaultModel}>
+                    <span>Model</span>
+                    <span className="font-mono text-foreground font-medium truncate max-w-[210px] flex items-center gap-1">
                       {p.defaultModel}
                       {isFreeModel && (
-                        <span className="text-[9px] font-bold bg-emerald-500/15 text-emerald-400 px-1 rounded">
-                          FREE
+                        <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 px-1 rounded">
+                          Free
                         </span>
                       )}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-muted-foreground text-[11px]">
-                    <span>Key Status:</span>
+                    <span>Key</span>
                     <span className="font-mono text-foreground">{p.apiKeyMasked}</span>
                   </div>
                   {p.latency && (
                     <div className="flex justify-between items-center text-muted-foreground text-[11px]">
-                      <span>Latency:</span>
-                      <span className="text-success font-medium">{p.latency}</span>
+                      <span>Latency</span>
+                      <span className="text-emerald-400 font-mono font-medium">{p.latency}</span>
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -418,14 +402,14 @@ export default function AiProvidersSettingsPage() {
                     onClick={() => handleOpenConfig(p)}
                   >
                     <Sliders className="h-3 w-3" />
-                    {isActive ? "Configure / Change Model" : "Add API Key"}
+                    {isActive ? "Configure" : "Connect Key"}
                   </Button>
 
                   {isActive && !p.isDefault && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-xs h-8 text-primary hover:text-primary hover:bg-primary/10"
+                      className="text-xs h-8 text-muted-foreground hover:text-foreground"
                       onClick={() => handleSetDefault(p.id)}
                     >
                       Set Default
@@ -436,9 +420,9 @@ export default function AiProvidersSettingsPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-xs h-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-2"
+                      className="text-xs h-8 text-muted-foreground hover:text-destructive px-2"
                       onClick={() => handleDisconnect(p)}
-                      title="Remove API Key"
+                      title="Disconnect"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -450,45 +434,46 @@ export default function AiProvidersSettingsPage() {
         })}
       </div>
 
-      {/* Security note */}
-      <div className="rounded-xl border border-border/60 bg-card/40 p-4 flex items-start gap-3 text-xs text-muted-foreground">
-        <ShieldCheck className="h-5 w-5 text-success shrink-0 mt-0.5" />
+      {/* Security Note */}
+      <div className="rounded-xl border border-border/50 bg-card/30 p-3.5 flex items-center gap-3 text-xs text-muted-foreground">
+        <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
         <div>
-          <span className="font-semibold text-foreground">Zero markup on BYO API keys:</span>{" "}
-          SocialHub connects directly to NVIDIA NIM, OpenRouter, OpenAI, and Gemini. API tokens are stored in your secure workspace storage and never exposed to 3rd parties.
+          Keys are stored in your secure workspace storage and routed directly to model endpoints.
         </div>
       </div>
 
-      {/* Provider Config Modal with 2-Step Test & Save Flow */}
+      {/* Distilled Config Dialog */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-5 gap-4">
+          <DialogHeader className="pb-1">
+            <DialogTitle className="text-base font-semibold flex items-center gap-2">
               Configure {selectedProvider?.name}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs text-muted-foreground">
               {selectedProvider?.id === "p-nvidia"
-                ? "Connect NVIDIA NIM to run Moonshot Kimi K3, Llama 3.3 70B, and DeepSeek R1 with ultra-low latency."
+                ? "Connect NVIDIA NIM with Moonshot Kimi K3, Llama 3.3 70B, or Nemotron."
                 : selectedProvider?.id === "p-openrouter"
-                ? "Select from 20+ Free OpenRouter models ($0 cost) or flagship models (Claude 3.5, GPT-4o, DeepSeek)."
-                : `Enter your ${selectedProvider?.name} credentials to enable direct model routing.`}
+                ? "Select from 20+ Free OpenRouter models ($0 cost) or flagship models."
+                : `Enter your ${selectedProvider?.name} API key to enable direct routing.`}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-1">
+          <div className="space-y-4 overflow-y-auto flex-1 pr-0.5">
             {/* API Key Input */}
             {selectedProvider?.providerType !== "free_default" && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="apiKeyInput">API Secret Key</Label>
+                  <Label htmlFor="apiKeyInput" className="text-xs font-medium">
+                    API Secret Key
+                  </Label>
                   {selectedProvider?.id === "p-nvidia" && (
                     <a
                       href="https://build.nvidia.com"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[11px] text-[#76B900] hover:underline flex items-center gap-1 font-medium"
+                      className="text-[11px] text-[#76B900] hover:underline flex items-center gap-1"
                     >
-                      Get NVIDIA NGC key <ExternalLink className="h-3 w-3" />
+                      Get NGC key <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
                   {selectedProvider?.id === "p-openrouter" && (
@@ -498,7 +483,7 @@ export default function AiProvidersSettingsPage() {
                       rel="noreferrer"
                       className="text-[11px] text-primary hover:underline flex items-center gap-1"
                     >
-                      Get free OpenRouter key <ExternalLink className="h-3 w-3" />
+                      Get key <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
                   {selectedProvider?.id === "p-openai" && (
@@ -508,7 +493,7 @@ export default function AiProvidersSettingsPage() {
                       rel="noreferrer"
                       className="text-[11px] text-primary hover:underline flex items-center gap-1"
                     >
-                      Get OpenAI key <ExternalLink className="h-3 w-3" />
+                      Get key <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
                   {selectedProvider?.id === "p-gemini" && (
@@ -518,7 +503,7 @@ export default function AiProvidersSettingsPage() {
                       rel="noreferrer"
                       className="text-[11px] text-primary hover:underline flex items-center gap-1"
                     >
-                      Get Gemini key <ExternalLink className="h-3 w-3" />
+                      Get key <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
                 </div>
@@ -530,86 +515,78 @@ export default function AiProvidersSettingsPage() {
                       ? "nvapi-..."
                       : selectedProvider?.id === "p-openrouter"
                       ? "sk-or-v1-..."
-                      : selectedProvider?.id === "p-openai"
-                      ? "sk-proj-..."
-                      : "AIzaSy..."
+                      : "sk-..."
                   }
                   value={inputKey}
                   onChange={(e) => handleKeyChange(e.target.value)}
-                  leftIcon={<Key className="h-4 w-4" />}
+                  leftIcon={<Key className="h-3.5 w-3.5 text-muted-foreground" />}
+                  className="h-9 text-xs font-mono"
                   autoFocus
                 />
               </div>
             )}
 
-            {/* Model Selection with Categories & Search */}
+            {/* Model Selection */}
             {selectedProvider && (
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="modelInput">Select Model</Label>
-
+                  <Label className="text-xs font-medium">Select Model</Label>
                   {selectedProvider.id === "p-openrouter" && (
-                    <Button
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-[11px] px-2 text-primary"
                       onClick={fetchLiveOpenRouterModels}
-                      isLoading={isLoadingLiveModels}
+                      disabled={isLoadingLiveModels}
+                      className="text-[11px] text-primary hover:underline flex items-center gap-1"
                     >
-                      <RefreshCw className="h-3 w-3 mr-1" />
-                      Sync All OpenRouter Models
-                    </Button>
+                      <RefreshCw className={`h-3 w-3 ${isLoadingLiveModels ? "animate-spin" : ""}`} />
+                      Sync Live Models
+                    </button>
                   )}
                 </div>
 
-                {/* OpenRouter Filter Tabs */}
+                {/* OpenRouter Segmented Filter Tabs */}
                 {selectedProvider.id === "p-openrouter" && (
-                  <div className="flex items-center gap-1.5 border-b border-border/60 pb-2">
+                  <div className="flex items-center bg-muted/40 p-0.5 rounded-lg border border-border/50 text-xs">
                     <button
                       type="button"
                       onClick={() => setModelTab("free")}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                      className={`flex-1 py-1 px-2 rounded-md font-medium text-xs transition-all ${
                         modelTab === "free"
-                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                          : "text-muted-foreground hover:bg-accent/40"
+                          ? "bg-card text-emerald-400 shadow-sm font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      <Gift className="h-3.5 w-3.5" />
-                      100% Free Models ({OPENROUTER_FREE_MODELS.length})
+                      Free ({OPENROUTER_FREE_MODELS.length})
                     </button>
-
                     <button
                       type="button"
                       onClick={() => setModelTab("popular")}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                      className={`flex-1 py-1 px-2 rounded-md font-medium text-xs transition-all ${
                         modelTab === "popular"
-                          ? "bg-purple-500/15 text-purple-300 border border-purple-500/30"
-                          : "text-muted-foreground hover:bg-accent/40"
+                          ? "bg-card text-foreground shadow-sm font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Popular / Flagship
+                      Flagship
                     </button>
-
                     <button
                       type="button"
                       onClick={() => setModelTab("all")}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                      className={`flex-1 py-1 px-2 rounded-md font-medium text-xs transition-all ${
                         modelTab === "all"
-                          ? "bg-primary/15 text-primary border border-primary/30"
-                          : "text-muted-foreground hover:bg-accent/40"
+                          ? "bg-card text-foreground shadow-sm font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      All Models
+                      All
                     </button>
                   </div>
                 )}
 
-                {/* Model Search Box */}
+                {/* Search */}
                 <div className="relative">
                   <Input
-                    placeholder="Search models by name or ID (e.g. kimi, nemotron, llama, claude)..."
+                    placeholder="Filter models by name or ID..."
                     value={modelSearchQuery}
                     onChange={(e) => setModelSearchQuery(e.target.value)}
                     leftIcon={<Search className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -617,11 +594,11 @@ export default function AiProvidersSettingsPage() {
                   />
                 </div>
 
-                {/* Models List */}
-                <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1 border border-border/40 rounded-xl p-1.5 bg-card/20">
+                {/* Distilled Model Items */}
+                <div className="space-y-1 max-h-48 overflow-y-auto pr-0.5 rounded-lg border border-border/50 bg-muted/10 p-1">
                   {displayedModels.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-muted-foreground">
-                      No models found matching &quot;{modelSearchQuery}&quot;. You can type a custom model ID below.
+                    <div className="p-3 text-center text-xs text-muted-foreground">
+                      No models matching &quot;{modelSearchQuery}&quot;
                     </div>
                   ) : (
                     displayedModels.map((preset) => {
@@ -634,79 +611,69 @@ export default function AiProvidersSettingsPage() {
                             handleModelChange(preset.id);
                             setShowCustomModelInput(false);
                           }}
-                          className={`w-full flex items-center justify-between p-2 rounded-lg border text-left text-xs transition-all ${
+                          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-left transition-all ${
                             isSelected
-                              ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/40"
-                              : "border-border/50 hover:bg-accent/40 text-muted-foreground"
+                              ? "bg-primary/10 border border-primary/40 text-foreground"
+                              : "border border-transparent hover:bg-muted/40 text-muted-foreground"
                           }`}
                         >
-                          <div className="flex flex-col flex-1 min-w-0 pr-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-foreground truncate">
+                          <div className="flex flex-col min-w-0 pr-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium text-xs text-foreground truncate">
                                 {preset.name}
                               </span>
-                              {preset.badge && (
-                                <Badge
-                                  variant={preset.isFree ? "success" : "secondary"}
-                                  className="text-[9px] py-0 px-1.5 font-bold"
-                                >
-                                  {preset.badge}
-                                </Badge>
-                              )}
-                              {preset.context && (
-                                <span className="text-[10px] text-muted-foreground bg-muted/60 px-1 rounded font-mono">
-                                  {preset.context} context
-                                </span>
-                              )}
-                              {preset.speed && (
-                                <span className="text-[10px] text-emerald-400/90 font-mono">
-                                  ⚡ {preset.speed}
+                              {preset.isFree && (
+                                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 px-1 rounded">
+                                  Free
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center justify-between mt-0.5">
-                              <span className="text-[10px] text-muted-foreground/90 font-mono truncate max-w-[280px]">
-                                {preset.id}
-                              </span>
-                              {preset.desc && (
-                                <span className="text-[10px] text-muted-foreground truncate max-w-[220px] hidden sm:inline">
-                                  {preset.desc}
-                                </span>
-                              )}
-                            </div>
+                            <span className="text-[10px] text-muted-foreground font-mono truncate">
+                              {preset.id}
+                            </span>
                           </div>
-                          {isSelected && (
-                            <Check className="h-4 w-4 text-primary shrink-0 ml-1" />
-                          )}
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {preset.context && (
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {preset.context}
+                              </span>
+                            )}
+                            {preset.speed && (
+                              <span className="text-[10px] text-emerald-400 font-mono">
+                                {preset.speed}
+                              </span>
+                            )}
+                            {isSelected && (
+                              <Check className="h-3.5 w-3.5 text-primary" />
+                            )}
+                          </div>
                         </button>
                       );
                     })
                   )}
                 </div>
 
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center justify-between text-xs pt-0.5">
                   <button
                     type="button"
                     onClick={() => setShowCustomModelInput(!showCustomModelInput)}
-                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                    className="text-primary hover:underline text-[11px]"
                   >
-                    {showCustomModelInput
-                      ? "Hide custom model input"
-                      : "+ Enter a custom model ID manually"}
+                    {showCustomModelInput ? "Hide custom ID" : "+ Enter custom model ID"}
                   </button>
 
-                  <span className="text-[11px] text-muted-foreground font-mono">
-                    Selected: <strong className="text-foreground">{selectedModel || "None"}</strong>
+                  <span className="text-[11px] text-muted-foreground font-mono truncate max-w-[200px]">
+                    {selectedModel}
                   </span>
                 </div>
 
                 {showCustomModelInput && (
                   <Input
-                    id="modelInput"
                     value={selectedModel}
                     onChange={(e) => handleModelChange(e.target.value)}
-                    placeholder="e.g. moonshotai/kimi-k3 or meta/llama-3.3-70b-instruct"
-                    className="font-mono text-xs mt-1"
+                    placeholder="e.g. moonshotai/kimi-k3 or meta-llama/llama-3.3-70b-instruct:free"
+                    className="font-mono text-xs h-8 mt-1"
                   />
                 )}
               </div>
@@ -714,8 +681,8 @@ export default function AiProvidersSettingsPage() {
 
             {/* Custom Base URL */}
             {selectedProvider?.providerType === "custom" && (
-              <div className="space-y-2">
-                <Label htmlFor="baseUrlInput">Custom Base URL</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="baseUrlInput" className="text-xs font-medium">Custom Base URL</Label>
                 <Input
                   id="baseUrlInput"
                   value={inputBaseUrl}
@@ -724,47 +691,45 @@ export default function AiProvidersSettingsPage() {
                     setTestStatus("idle");
                   }}
                   placeholder="https://integrate.api.nvidia.com/v1"
+                  className="h-8 text-xs font-mono"
                 />
               </div>
             )}
 
-            {/* Verification Result Callout */}
+            {/* Inline Verification Status */}
             {testStatus === "success" && (
-              <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 flex items-start gap-3 text-xs animate-in fade-in-50">
-                <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-emerald-400">
-                    Connection Verified & Ready to Save!
-                  </div>
-                  <div className="text-[11px] text-emerald-300/90 mt-0.5 font-mono">
-                    Model: <strong>{selectedModel}</strong> • Latency: <strong>{testResult?.latency}</strong>
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    Click <strong>&quot;Save & Activate Provider&quot;</strong> below to save this model.
-                  </div>
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 flex items-center justify-between text-xs animate-in fade-in-50">
+                <div className="flex items-center gap-2 text-emerald-400 font-medium">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Connection verified ({testResult?.latency})</span>
                 </div>
+                <span className="text-[11px] text-emerald-300/80 font-mono truncate max-w-[140px]">
+                  {selectedModel}
+                </span>
               </div>
             )}
 
             {testStatus === "error" && (
-              <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 flex items-start gap-3 text-xs animate-in fade-in-50">
-                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-destructive">Connection Failed</div>
-                  <div className="text-[11px] text-destructive/90 mt-0.5">
-                    {testResult?.error || "Could not authenticate with provider."}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    Please check your API key and model ID, then click &quot;Test Connection&quot; again.
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 flex items-start gap-2 text-xs text-destructive animate-in fade-in-50">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <div className="font-medium">Verification Failed</div>
+                  <div className="text-[11px] opacity-90 truncate">
+                    {testResult?.error || "Could not authenticate."}
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* 2-Step Footer: Step 1 = Test Connection, Step 2 = Save & Activate (shown when verified) */}
+          {/* Distilled Footer */}
           <DialogFooter className="border-t border-border/40 pt-3 flex items-center justify-between gap-2 sm:justify-between">
-            <Button variant="outline" onClick={() => setModalOpen(false)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setModalOpen(false)}
+              className="text-xs h-8"
+            >
               Cancel
             </Button>
 
@@ -772,11 +737,12 @@ export default function AiProvidersSettingsPage() {
               <Button
                 type="button"
                 variant={testStatus === "success" ? "outline" : "brand"}
+                size="sm"
                 isLoading={isTesting}
                 onClick={handleTestConnection}
-                className="text-xs"
+                className="text-xs h-8 gap-1.5"
               >
-                <Zap className="h-3.5 w-3.5 mr-1" />
+                <Zap className="h-3 w-3" />
                 {testStatus === "success" ? "Test Again" : "Test Connection"}
               </Button>
 
@@ -784,11 +750,12 @@ export default function AiProvidersSettingsPage() {
                 <Button
                   type="button"
                   variant="brand"
+                  size="sm"
                   onClick={handleSaveVerifiedConfig}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs animate-in fade-in-50"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs h-8 gap-1.5 animate-in fade-in-50"
                 >
-                  <Check className="h-3.5 w-3.5 mr-1" />
-                  Save & Activate Provider
+                  <Check className="h-3.5 w-3.5" />
+                  Save & Activate
                 </Button>
               )}
             </div>
